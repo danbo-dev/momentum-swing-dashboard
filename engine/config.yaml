@@ -1,0 +1,170 @@
+# ============================================================================
+# Momentum-Swing Dashboard — engine configuration
+# Strategy: momentum + catalysts, with a quality/liquidity GATE.
+# Horizon: multi-week to ~1 month swing.
+# Design principle: GATES are hard filters; FACTORS are weighted 0..1 sub-scores.
+# ============================================================================
+
+account:
+  capital: 5000            # total paper capital
+  risk_per_trade_pct: 1.0  # % of capital risked per trade (drives ATR sizing)
+  max_budget_per_trade: 500
+
+# ---------------------------------------------------------------------------
+# UNIVERSE + GATES (hard filters — a name must pass ALL enabled gates)
+# ---------------------------------------------------------------------------
+universe:
+  exchanges: [XNYS, XNAS, XASE]   # NYSE, NASDAQ, AMEX
+  types: [CS, ETF]                # common stock + ETFs
+  exclude_name_patterns:          # drop leveraged/inverse ETFs & derivatives
+    - " 2X"
+    - " 3X"
+    - "ULTRA"
+    - "INVERSE"
+    - "-U"                        # units
+    - " WT"                       # warrants
+  limit: null                     # cap size (null = all); env CONTEXT_UNIVERSE_LIMIT overrides
+
+# ---------------------------------------------------------------------------
+# FUNNEL — broad-universe screen (Stages 1-2). Turns the whole-market base list
+# into the day's deep-dive BUCKET using only cheap grouped-daily bars (~1 API
+# call/day for all prices). Filters + momentum_rank_keep determine the bucket;
+# max_bucket (null = uncapped) is an optional cost backstop that RAISES the
+# momentum threshold, never an arbitrary top-N slice. Only used when
+# data.polygon.use_seed_universe is false.
+# ---------------------------------------------------------------------------
+funnel:
+  screen_days: 90                 # completed trading days of grouped bars for the screen
+                                  # (~4.5mo => Stage-2 ranks sustained trends, not 1-mo spikes)
+  price_band: [5, 100]            # Stage-1 price filter; $100 cap keeps buys deployable at
+                                  # ~$500/trade (>=5 shares) and favors higher-% upside names
+  min_dollar_volume: 10_000_000   # Stage-1 liquidity floor: >= $10M/day median (screen window)
+  min_screen_bars: 60             # must trade in >= N of the screen_days (drops new/thin listings)
+  momentum_short_window: 10       # short leg of the blended relative-strength rank
+  momentum_rank_keep: 0.25        # Stage-2: keep the top fraction by excess-return rank
+  max_bucket: null                # null = uncapped (rely on the momentum rank); set an int
+                                  # (or CONTEXT_FUNNEL_MAX_BUCKET) to backstop cost in CI
+  # Reversal lane — admit early-turn candidates the momentum rank drops, so the
+  # reversal playbook has names to work with (a momentum bucket is all extended).
+  reversal_lane: true
+  reversal_lane_ma: 50            # reclaiming this MA from below = the cheap-screen setup
+  reversal_lane_lookback: 10      # was under the MA within this many recent bars
+  reversal_lane_band: 0.10        # only fresh reclaims (price <= band above the MA), not extended
+  reversal_lane_max: 60           # cap reversal-lane additions to the deep-dive bucket
+
+gates:
+  liquidity:
+    enabled: true
+    min_price: 5.0                # drop sub-$5 junk
+    min_avg_dollar_volume: 5_000_000   # >= $5M/day median dollar volume (20d)
+    min_history_days: 150         # need enough bars for 200d context to seed
+  quality:
+    enabled: true                 # light, modular — widen/narrow freely
+    # From Finnhub basic financials when available; missing data => not rejected.
+    max_debt_to_equity: 3.0
+    require_positive_gross_margin: true
+
+# ---------------------------------------------------------------------------
+# FACTORS (each yields a 0..1 sub-score; composite = weighted sum, renormalized
+# over the factors that actually have data). Promote quality/value here later.
+# ---------------------------------------------------------------------------
+factors:
+  momentum:
+    weight: 0.45
+    lookbacks_days: [63, 126, 252]   # ~3m, 6m, 12m total return
+    lookback_weights: [0.3, 0.3, 0.4]
+    rs_benchmark: SPY                # relative strength vs benchmark
+    high_52w_proximity_weight: 0.25  # closeness to 52-week high (within momentum)
+  trend:
+    weight: 0.20
+    # Reward price above rising long MAs (the deliberate opposite of the old
+    # "buy below 200 EMA" logic). Full credit when above both and 50>200.
+    ma_fast: 50
+    ma_slow: 200
+  catalyst:
+    weight: 0.20
+    earnings_soon_days: 10          # earnings within N days => flagged
+    reward_pre_earnings: false      # do NOT reward holding into a print by default
+    pead_surprise_weight: 0.5       # recent positive EPS surprise (drift)
+    rec_trend_weight: 0.5           # improving analyst recommendation trend
+  trigger:
+    weight: 0.15
+    # Horizon-matched timing (replaces fast 5/9). Pullback to rising fast EMA,
+    # or a fast>slow EMA cross within `cross_lookback` bars. This is the
+    # CONTINUATION playbook's trigger.
+    ema_fast: 20
+    ema_slow: 50
+    cross_lookback: 10
+    rsi_period: 14
+    rsi_floor: 40                   # avoid oversold-broken names
+    rsi_ceiling: 75                 # avoid already-overbought entries
+
+# ---------------------------------------------------------------------------
+# ENTRY PLAYBOOKS — two tagged setups. Continuation uses factors.trigger above
+# (established uptrend). Reversal catches the early upswing before continuation
+# confirms: earlier entry = more false signals, so its ATR stop is tighter.
+# ---------------------------------------------------------------------------
+playbooks:
+  reversal:
+    ema_fast: 5                     # fast cross for an early turn
+    ema_slow: 9
+    cross_lookback: 5
+    rsi_oversold: 35                # RSI must be lifting back up through this
+    reclaim_lookback: 10            # window for the cross / MA-reclaim to have happened
+    reclaim_ma: 50                  # price reclaiming this MA from below = the setup
+    flag_ma: 200                    # reclaiming this from below is flagged (bigger turn)
+    atr_stop_mult: 1.5              # tighter than continuation's 2.0 (reversal risk)
+    # Reversal names rank on their OWN logic: de-weight raw momentum (they dipped)
+    # and reward the turn setup + reclaim. Used only for reversal-primary names.
+    weights:
+      momentum: 0.20
+      trend: 0.25
+      catalyst: 0.15
+      trigger: 0.40
+
+# ---------------------------------------------------------------------------
+# RISK / SIZING / MARKET REGIME
+# ---------------------------------------------------------------------------
+risk:
+  atr_period: 14
+  atr_stop_mult: 2.0               # initial stop = entry - 2*ATR
+  target_r_multiple: 3.0           # target = entry + 3R  (=> R:R 3:1 gross)
+  min_reward_risk: 2.0             # only surface setups with R:R >= this
+  trailing_stop_pct: 10.0          # exit-signal trailing stop
+market_regime:
+  benchmark: SPY
+  ma: 200                          # SPY above its 200d MA => "risk on"
+  throttle_when_risk_off: true     # penalize/flag new longs when risk-off
+
+# ---------------------------------------------------------------------------
+# SIGNAL BUCKETS (composite score is 0..100 after weighting)
+# ---------------------------------------------------------------------------
+signals:
+  strong_buy: 75                   # "Load the boat" — plus must pass trigger + R:R
+  watch: 60
+  top_n: 40                        # cap the opportunities list
+
+# ---------------------------------------------------------------------------
+# DATA PROVIDERS
+# ---------------------------------------------------------------------------
+data:
+  price_provider: polygon          # polygon | tiingo | yfinance(local only)
+  fundamental_provider: finnhub
+  history_days: 400                # daily bars to pull/keep
+  cache_ttl_hours: 20              # reuse cached raw responses within a run-day
+  polygon:
+    grouped_daily: true            # whole-market EOD in 1 call/day (drives the funnel screen)
+    rate_limit_per_min: 100        # Stocks Starter = unlimited calls; 100 => 0.6s spacing
+                                   # (network latency dominates at this point, not the limiter)
+    use_seed_universe: false       # false => broad whole-market funnel (Stages 0-3);
+                                   # true  => curated 79-name seed (offline/fallback default)
+  finnhub:
+    rate_limit_per_min: 60
+
+# ---------------------------------------------------------------------------
+# BACKTEST
+# ---------------------------------------------------------------------------
+backtest:
+  horizon_days: 21                 # ~1 trading month forward return
+  cost_bps: 10                     # round-trip cost/slippage assumption (bps)
+  min_names_per_day: 20

@@ -1,0 +1,27 @@
+# --- secrets ---
+.env
+.env.local
+*.key
+
+# --- python ---
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+
+# --- engine local cache (raw API responses) ---
+engine/.cache/
+
+# --- node / next ---
+web/node_modules/
+web/.next/
+web/out/
+web/.vercel/
+web/tsconfig.tsbuildinfo
+
+# --- claude code local settings ---
+.claude/settings.local.json
+
+# --- os ---
+.DS_Store

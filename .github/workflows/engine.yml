@@ -1,0 +1,66 @@
+name: engine
+
+# Scheduled scans. GitHub cron is best-effort (can lag 20-40 min at :00), so we
+# use odd minutes. Times are UTC; US market close 16:00 ET = 20:00 UTC (EDT) /
+# 21:00 UTC (EST). We run ~40 min after the EDT close and once midday.
+on:
+  schedule:
+    - cron: "37 20 * * 1-5"   # ~40 min after the 16:00 ET close (EDT)
+    - cron: "7 17 * * 1-5"    # ~13:00 ET midday check
+  workflow_dispatch: {}       # manual "Run workflow" button
+
+concurrency:
+  group: engine
+  cancel-in-progress: false
+
+permissions:
+  contents: write             # allow committing refreshed data back
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      # Persist the engine's on-disk API cache (grouped-daily frames + per-ticker
+      # history) across runs. Immutable grouped dates stay cached forever, so
+      # steady-state runs fetch only the newly-completed day + new-to-bucket
+      # tickers instead of cold-fetching the whole funnel. A run-id-unique key
+      # always saves; restore-keys pulls the most recent cache to build on.
+      - name: Cache engine API responses
+        uses: actions/cache@v4
+        with:
+          path: engine/.cache
+          key: engine-cache-${{ github.run_id }}
+          restore-keys: |
+            engine-cache-
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Run scan + backtest
+        env:
+          POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          TIINGO_API_KEY: ${{ secrets.TIINGO_API_KEY }}
+          CONTEXT_UNIVERSE_LIMIT: ${{ vars.CONTEXT_UNIVERSE_LIMIT }}
+        run: |
+          python -m engine
+          python -m engine.backtest
+
+      - name: Commit refreshed data
+        run: |
+          git config user.name  "engine-bot"
+          git config user.email "engine-bot@users.noreply.github.com"
+          git add web/public/data/*.json
+          if git diff --cached --quiet; then
+            echo "No data changes."
+          else
+            git commit -m "data: scheduled refresh $(date -u +%Y-%m-%dT%H:%MZ)"
+            git push
+          fi

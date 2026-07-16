@@ -1,0 +1,195 @@
+/* ============================================================================
+   Design tokens — validated dataviz reference palette (light + dark selected).
+   Categorical slots 1-4 carry the four factors; status colors are reserved for
+   buy/sell + exit traffic-lights (always shipped with an icon/label).
+   ============================================================================ */
+:root {
+  --surface-1: #fcfcfb;      /* card / chart surface */
+  --plane:     #f9f9f7;      /* page background */
+  --text-1:    #0b0b0b;
+  --text-2:    #52514e;
+  --muted:     #898781;
+  --grid:      #e1e0d9;
+  --baseline:  #c3c2b7;
+  --border:    rgba(11, 11, 11, 0.10);
+
+  /* factors (categorical, fixed order) */
+  --f-momentum: #2a78d6;     /* slot 1 blue */
+  --f-trend:    #1baf7a;     /* slot 2 aqua */
+  --f-catalyst: #eda100;     /* slot 3 yellow */
+  --f-trigger:  #008300;     /* slot 4 green */
+
+  /* status (reserved, never themed) */
+  --good:     #0ca30c;
+  --warning:  #fab219;
+  --serious:  #ec835a;
+  --critical: #d03b3b;
+
+  /* diverging poles for the heatmap */
+  --div-pos: #2a78d6;        /* blue = up */
+  --div-neg: #d03b3b;        /* red = down */
+  --div-mid: #f0efec;
+
+  --pos: #006300;            /* positive delta text */
+  --neg: #c0392b;            /* negative delta text */
+  color-scheme: light dark;
+}
+
+:root[data-theme="dark"],
+:root:not([data-theme="light"]) {
+  /* dark defaults applied below via media query */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --surface-1: #1a1a19;
+    --plane:     #0d0d0d;
+    --text-1:    #ffffff;
+    --text-2:    #c3c2b7;
+    --muted:     #898781;
+    --grid:      #2c2c2a;
+    --baseline:  #383835;
+    --border:    rgba(255, 255, 255, 0.10);
+    --f-momentum: #3987e5;
+    --f-trend:    #199e70;
+    --f-catalyst: #c98500;
+    --f-trigger:  #008300;
+    --div-pos: #3987e5;
+    --div-neg: #d03b3b;
+    --div-mid: #383835;
+    --pos: #0ca30c;
+    --neg: #e66767;
+  }
+}
+/* explicit override wins over system when the toggle is used */
+:root[data-theme="dark"] {
+  --surface-1: #1a1a19; --plane: #0d0d0d; --text-1: #ffffff; --text-2: #c3c2b7;
+  --muted: #898781; --grid: #2c2c2a; --baseline: #383835;
+  --border: rgba(255,255,255,0.10);
+  --f-momentum: #3987e5; --f-trend: #199e70; --f-catalyst: #c98500; --f-trigger: #008300;
+  --div-pos: #3987e5; --div-neg: #d03b3b; --div-mid: #383835; --pos: #0ca30c; --neg: #e66767;
+}
+:root[data-theme="light"] {
+  --surface-1: #fcfcfb; --plane: #f9f9f7; --text-1: #0b0b0b; --text-2: #52514e;
+  --muted: #898781; --grid: #e1e0d9; --baseline: #c3c2b7;
+}
+
+* { box-sizing: border-box; }
+html, body { padding: 0; margin: 0; }
+body {
+  background: var(--plane);
+  color: var(--text-1);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; }
+h1, h2, h3 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
+
+.wrap { max-width: 1240px; margin: 0 auto; padding: 20px 20px 80px; }
+.row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.spread { justify-content: space-between; }
+.muted { color: var(--muted); }
+.sec2 { color: var(--text-2); }
+.tnum { font-variant-numeric: tabular-nums; }
+.pos { color: var(--pos); } .neg { color: var(--neg); }
+
+.card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
+.section-title { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin-bottom: 10px; }
+
+/* KPI tiles */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+.tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+.tile .v { font-size: 26px; font-weight: 680; letter-spacing: -0.02em; }
+.tile .k { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+
+/* badges */
+.badge { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid var(--border); white-space: nowrap; }
+.badge.strong_buy { background: color-mix(in srgb, var(--good) 16%, transparent); color: var(--good); border-color: color-mix(in srgb, var(--good) 40%, transparent); }
+.badge.watch { background: color-mix(in srgb, var(--f-momentum) 14%, transparent); color: var(--f-momentum); border-color: color-mix(in srgb, var(--f-momentum) 38%, transparent); }
+.badge.status-good { color: var(--good); background: color-mix(in srgb, var(--good) 14%, transparent); }
+.badge.status-warning { color: color-mix(in srgb, var(--warning) 72%, var(--text-1)); background: color-mix(in srgb, var(--warning) 20%, transparent); }
+.badge.status-serious { color: var(--serious); background: color-mix(in srgb, var(--serious) 18%, transparent); }
+.badge.status-critical { color: var(--critical); background: color-mix(in srgb, var(--critical) 16%, transparent); }
+
+/* dot for status */
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.dot.green { background: var(--good); } .dot.yellow { background: var(--warning); }
+.dot.orange { background: var(--serious); } .dot.red { background: var(--critical); }
+
+/* table */
+table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.tbl th { text-align: right; color: var(--muted); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--grid); position: sticky; top: 0; background: var(--surface-1); font-size: 12px; cursor: pointer; user-select: none; }
+table.tbl th.l, table.tbl td.l { text-align: left; }
+table.tbl td { padding: 9px 10px; border-bottom: 1px solid var(--grid); text-align: right; }
+table.tbl tr.rowbtn { cursor: pointer; }
+table.tbl tr.rowbtn:hover td { background: color-mix(in srgb, var(--f-momentum) 6%, transparent); }
+.detail { background: var(--plane); }
+.detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; padding: 6px 4px 12px; }
+
+.btn { background: var(--surface-1); border: 1px solid var(--border); color: var(--text-1); border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer; }
+.btn:hover { background: color-mix(in srgb, var(--f-momentum) 8%, var(--surface-1)); }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 820px) { .grid2 { grid-template-columns: 1fr; } }
+
+/* ---- buttons (variants) ---- */
+.btn.sm { padding: 3px 9px; font-size: 12px; border-radius: 7px; }
+.btn.primary { background: var(--f-momentum); border-color: var(--f-momentum); color: #fff; font-weight: 600; }
+.btn.primary:hover { background: color-mix(in srgb, var(--f-momentum) 85%, #000); }
+.btn.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn.ghost { background: transparent; }
+.btn.ghost:hover { background: color-mix(in srgb, var(--text-1) 6%, transparent); }
+.btn.danger { background: var(--critical); border-color: var(--critical); color: #fff; font-weight: 600; }
+.btn.danger:hover { background: color-mix(in srgb, var(--critical) 85%, #000); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ---- segmented toggle (Paper/Real, filter tabs) ---- */
+.segmented { display: inline-flex; border: 1px solid var(--border); border-radius: 9px; padding: 3px; gap: 3px; background: var(--plane); }
+.segmented button {
+  flex: 1; background: transparent; border: none; color: var(--text-2);
+  font-size: 13px; font-weight: 600; padding: 6px 14px; border-radius: 7px; cursor: pointer; white-space: nowrap;
+}
+.segmented button:hover { color: var(--text-1); }
+.segmented button.on { background: var(--surface-1); color: var(--text-1); box-shadow: 0 1px 2px rgba(0,0,0,0.12); }
+
+/* ---- dropdown menu ---- */
+.menu-backdrop { position: fixed; inset: 0; z-index: 40; }
+.menu {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 41;
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18); padding: 6px; min-width: 210px;
+}
+.menu button {
+  display: block; width: 100%; text-align: left; background: none; border: none;
+  color: var(--text-1); font-size: 13px; padding: 8px 10px; border-radius: 7px; cursor: pointer;
+}
+.menu button:hover { background: color-mix(in srgb, var(--f-momentum) 10%, transparent); }
+
+/* ---- modal ---- */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 50; display: flex; align-items: flex-start;
+  justify-content: center; padding: 8vh 16px 16px; background: rgba(0,0,0,0.45);
+  overflow-y: auto;
+}
+.modal-card {
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px;
+  padding: 18px; width: 100%; max-width: 560px; box-shadow: 0 16px 48px rgba(0,0,0,0.3);
+}
+
+/* ---- forms ---- */
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 520px) { .form-grid { grid-template-columns: 1fr; } }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field input, .field select, .modal-card textarea {
+  background: var(--plane); border: 1px solid var(--border); color: var(--text-1);
+  border-radius: 8px; padding: 7px 9px; font-size: 14px; font-family: inherit; width: 100%;
+}
+.field input:focus, .field select:focus, .modal-card textarea:focus {
+  outline: none; border-color: var(--f-momentum);
+}
