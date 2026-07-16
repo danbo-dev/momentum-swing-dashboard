@@ -14,6 +14,7 @@ Usage:  python -m engine.backtest   ->  data/backtest.json
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 import numpy as np
@@ -92,7 +93,11 @@ def run_backtest() -> dict:
             dfk = hist[tk]
             if t not in dfk.index or t_fwd not in dfk.index:
                 continue
-            fwd = float(dfk["close"].loc[t_fwd] / dfk["close"].loc[t] - 1) - cost
+            p0 = float(dfk["close"].loc[t])
+            p1 = float(dfk["close"].loc[t_fwd])
+            if not (p0 > 0) or p1 != p1:  # skip non-positive/NaN base or NaN forward price
+                continue
+            fwd = (p1 / p0 - 1) - cost
             rows.append({"date": str(t.date()), "ticker": tk, "score": score, "fwd": fwd})
         if len(rows) < bt["min_names_per_day"]:
             continue
@@ -175,11 +180,25 @@ def _verdict(ic: float, spread: float) -> str:
     return "no_edge"
 
 
+def _finite(obj):
+    """Recursively replace non-finite floats (inf/NaN) with None. The browser's
+    JSON.parse rejects the `Infinity`/`NaN` tokens Python emits by default, which
+    would break the dashboard; None (null) is valid and renders as a gap."""
+    if isinstance(obj, float):
+        return obj if math.isfinite(obj) else None
+    if isinstance(obj, dict):
+        return {k: _finite(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_finite(v) for v in obj]
+    return obj
+
+
 def main() -> int:
     res = run_backtest()
     out = REPO_ROOT / "web" / "public" / "data" / "backtest.json"
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(res, indent=2))
+    # allow_nan=False asserts the sanitizer caught everything (else it raises loudly)
+    out.write_text(json.dumps(_finite(res), indent=2, allow_nan=False))
     if "error" in res:
         print(f"[backtest] {res['error']}")
     else:

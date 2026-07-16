@@ -9,6 +9,9 @@ export const signedMoney = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${
 export const rMult = (n: number | null | undefined) =>
   n == null ? "—" : `${n >= 0 ? "+" : "−"}${Math.abs(n).toFixed(2)}R`;
 
+// Formats an ISO timestamp in the viewer's local time zone. Because the browser
+// (not the server) supplies the zone, call this on the client — see
+// <UpdatedAt> — otherwise it renders in the server's zone (UTC on Vercel).
 export const fmtDate = (iso: string) => {
   try {
     return new Date(iso).toLocaleString("en-US", {
@@ -16,6 +19,7 @@ export const fmtDate = (iso: string) => {
       day: "numeric",
       hour: "numeric",
       minute: "2-digit",
+      timeZoneName: "short",
     });
   } catch {
     return iso;

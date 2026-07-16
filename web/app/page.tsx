@@ -1,5 +1,5 @@
 import { loadBacktest, loadResults } from "@/lib/data";
-import { fmtDate } from "@/lib/format";
+import UpdatedAt from "@/components/UpdatedAt";
 import type { Quote, RealSeed } from "@/lib/paper";
 import StatTiles from "@/components/StatTiles";
 import RegimePanel from "@/components/RegimePanel";
@@ -75,7 +75,7 @@ export default async function Page() {
           </div>
         </div>
         <div className="row" style={{ gap: 10 }}>
-          <span className="muted" style={{ fontSize: 12 }}>Updated {fmtDate(r.generated_at)}</span>
+          <span className="muted" style={{ fontSize: 12 }}><UpdatedAt iso={r.generated_at} /></span>
           <ThemeToggle />
         </div>
       </header>
