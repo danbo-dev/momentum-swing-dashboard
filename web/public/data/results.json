@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "generated_at": "2026-07-21T18:59:06.133738+00:00",
+  "generated_at": "2026-07-21T21:43:30.368171+00:00",
   "providers": {
     "price": "polygon",
     "fundamental": "finnhub"
