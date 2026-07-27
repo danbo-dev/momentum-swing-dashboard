@@ -154,7 +154,9 @@ data:
   cache_ttl_hours: 20              # reuse cached raw responses within a run-day
   polygon:
     grouped_daily: true            # whole-market EOD in 1 call/day (drives the funnel screen)
-    rate_limit_per_min: 100        # Stocks Starter = unlimited calls; 100 => 0.6s spacing
+    rate_limit_per_min: 2000        # Stocks Starter = unlimited calls; high value
+                                    # effectively disables the spacing limiter.
+                                    # Lower it only if you downgrade the plan.        # Stocks Starter = unlimited calls; 100 => 0.6s spacing
                                    # (network latency dominates at this point, not the limiter)
     use_seed_universe: false       # false => broad whole-market funnel (Stages 0-3);
                                    # true  => curated 79-name seed (offline/fallback default)

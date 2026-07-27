@@ -99,6 +99,10 @@ def main(argv: list[str] | None = None) -> int:
         f"on_session={a['pct_on_session']}% "
         f"-> {out}"
     )
+    if r.get("timings_sec"):
+        slow = sorted(r["timings_sec"].items(), key=lambda kv: -kv[1])
+        print("[engine] stage timings (s): "
+              + ", ".join(f"{k}={v}" for k, v in slow))
     return 0
 
 

@@ -1,6 +1,8 @@
-"""Polygon.io ("Massive") free-tier price + universe provider.
+"""Polygon.io price + universe provider.
 
-Free tier: 5 calls/min, EOD only, ~2y history. Universe via the ticker
+Runs on Stocks Starter (unlimited calls, 15-min delayed, 5y history); the
+rate limiter in config is set high enough to be a no-op. On the free tier
+(5 calls/min, ~2y history) lower it and cap the universe. Universe via the ticker
 reference endpoint; history via per-ticker daily aggregates (one call returns a
 ticker's whole range). Both are rate-limited and disk-cached. For large
 universes on the free tier, set `universe.limit` (or CONTEXT_UNIVERSE_LIMIT).

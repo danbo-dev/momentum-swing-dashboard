@@ -79,6 +79,7 @@ def build_results(
     hist: dict | None = None,
     held: set | None = None,
     session=None,
+    timings: dict | None = None,
 ) -> dict:
     s = cfg["signals"]
     # top_n by score, PLUS every qualifying reversal setup (they rank lower on the
@@ -135,6 +136,7 @@ def build_results(
         "schema_version": SCHEMA_VERSION,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "as_of": session_block,
+        "timings_sec": timings or {},
         "providers": provider_names,
         "strategy": {
             "name": "Momentum + catalysts (quality-gated)",

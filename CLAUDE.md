@@ -105,10 +105,12 @@ path, not a differently-timed run.
   TypeScript treats every directory in `@types/` as an implicit type library, so a stray
   `@types/node 2` fails the build with `Cannot find type definition file for 'node 2'`. Fix:
   `rm -rf node_modules && npm ci`. CI never sees this — it installs clean.
-- **`data.polygon.rate_limit_per_min` is 100, but the free tier is 5/min** (README says so, and a
-  ~500-ticker run taking ~2h matches ~5/min). The limiter therefore doesn't throttle; Polygon 429s
-  and `_http.py` backs off 5/10/20/40s, and a ticker can be dropped after 4 failures. Setting it to
-  5 would likely be faster *and* lossless — unverified against the actual plan.
+- **Polygon plan is Stocks Starter — unlimited calls**, so Polygon is NOT the bottleneck and there
+  is no 429 backoff. (An earlier note here claimed the opposite from stale free-tier docs; the
+  limiter is now set high enough to be a no-op.) **Finnhub's 60/min free tier is the real limit**:
+  ~1,460 calls for ~490 survivors ≈ 24 min. That plus ~6 min of former Polygon spacing accounts for
+  only ~30 min of a ~2h cold run — the rest is unexplained, which is why `results.json.timings_sec`
+  now records wall-clock per stage. Read it before optimising anything.
 - **Judge strategy performance on `kind: "paper"` trades only.** The `real` lots are a migrated
   buy-and-hold seed (`migratedReal: true`) whose P&L swamps the swing results.
 - `trend_score` saturates at 1.0 for any name above both MAs — never rank on it; use `score`.
@@ -118,7 +120,10 @@ path, not a differently-timed run.
 - **Reconsider the trailing stop only with more data.** ATR-scaling was investigated 2026-07-27 and
   **rejected**: replayed on real bars a 2.5xATR trail lost $246 vs the flat 10%'s $80 across the
   four closed paper trades — all four kept falling after the stop. Revisit after ~20 more trades.
-- **Confirm `data.polygon.rate_limit_per_min`** against the actual plan (see gotcha).
+- **Find the missing ~80 min of a cold run** using `results.json.timings_sec` (added 2026-07-27).
+  Prime suspect is `grouped_bars`: 90 whole-market grouped-daily responses, ~13.5k tickers each,
+  downloaded, JSON-parsed and disk-cached — not a rate limit, just volume. If so, options are a
+  shorter `funnel.screen_days`, a columnar cache, or reusing prior days' parsed frames.
 - **Surface `acknowledgeBreach` in the UI** — the helper exists in `paper.ts` but nothing calls it,
   so a latched breach flag currently clears only by selling.
 - **Automate `HELD_TICKERS`** (see above) so holdings reach CI without a manual secret update.

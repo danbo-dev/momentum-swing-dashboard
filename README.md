@@ -54,8 +54,11 @@ pytest engine/tests -q
 ```
 
 Providers are chosen automatically: real keys → Polygon/Finnhub, otherwise
-synthetic. On the Polygon free tier (5 calls/min) cap the universe with
-`CONTEXT_UNIVERSE_LIMIT` while testing.
+synthetic. This project runs on Polygon **Stocks Starter** (unlimited API calls,
+15-min delayed, 5y history), so `data.polygon.rate_limit_per_min` is set high
+enough to effectively disable spacing. Finnhub's free tier (60/min) is the real
+limiter. If you run on Polygon's free tier instead (5 calls/min), lower that
+value and cap the universe with `CONTEXT_UNIVERSE_LIMIT`.
 
 ## Held positions (`HELD_TICKERS`) — keep this current
 

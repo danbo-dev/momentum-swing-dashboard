@@ -5,6 +5,9 @@ gating first, then fundamentals (Finnhub) are fetched ONLY for survivors.
 """
 from __future__ import annotations
 
+import time
+from contextlib import contextmanager
+
 from .config import load_config
 from .data import get_fundamental_provider, get_price_provider
 from .indicators import rsi
@@ -26,8 +29,20 @@ from .strategy.universe import (
 )
 
 
+@contextmanager
+def _stage(timings: dict, name: str):
+    """Record wall-clock per pipeline stage. A cold run takes ~2h and the rate limits
+    only account for ~30 min of it; without per-stage numbers the rest is guesswork."""
+    t0 = time.perf_counter()
+    try:
+        yield
+    finally:
+        timings[name] = round(time.perf_counter() - t0, 1)
+
+
 def run_scan(positions: list[dict] | None = None, session=None) -> dict:
     cfg = load_config()
+    timings: dict[str, float] = {}
     # Resolve the trading session ONCE and thread it through every fetch. A cold run
     # takes ~2h on the free tier; without this it straddles the close and mixes
     # intraday snapshots with real closes. See engine/session.py.
@@ -36,7 +51,8 @@ def run_scan(positions: list[dict] | None = None, session=None) -> dict:
     fund = get_fundamental_provider()
 
     benchmark = cfg["market_regime"]["benchmark"]
-    metas = price.get_universe()
+    with _stage(timings, "universe"):
+        metas = price.get_universe()
 
     # --- Stage 0: base list — type + name exclusions + optional limit ---
     allowed_types = set(cfg["universe"]["types"])
@@ -57,10 +73,12 @@ def run_scan(positions: list[dict] | None = None, session=None) -> dict:
         and hasattr(price, "get_recent_bars")
     )
     if use_funnel:
-        frame = price.get_recent_bars(cfg["funnel"]["screen_days"])
-        bucket, funnel_stats = screen_universe(
-            frame, set(meta_by), benchmark, cfg, force_include=held
-        )
+        with _stage(timings, "grouped_bars"):
+            frame = price.get_recent_bars(cfg["funnel"]["screen_days"])
+        with _stage(timings, "screen"):
+            bucket, funnel_stats = screen_universe(
+                frame, set(meta_by), benchmark, cfg, force_include=held
+            )
         tickers = list(bucket)
     else:
         tickers = [m.ticker for m in metas]
@@ -72,7 +90,8 @@ def run_scan(positions: list[dict] | None = None, session=None) -> dict:
         if tk not in tickers:
             tickers.append(tk)
 
-    hist = price.get_history(tickers, cfg["data"]["history_days"])
+    with _stage(timings, "history"):
+        hist = price.get_history(tickers, cfg["data"]["history_days"])
     if benchmark not in hist:
         raise RuntimeError(f"benchmark {benchmark} missing from price history")
     bench_df = hist[benchmark]
@@ -96,7 +115,9 @@ def run_scan(positions: list[dict] | None = None, session=None) -> dict:
         survivors.append(tk)
 
     # --- Stage B: fundamentals for survivors only ---
-    earnings = fund.get_earnings(survivors)
+    with _stage(timings, "earnings"):
+        earnings = fund.get_earnings(survivors)
+    _t_fund = time.perf_counter()
     quality_dropped = 0
     features = []
     for tk in survivors:
@@ -155,6 +176,7 @@ def run_scan(positions: list[dict] | None = None, session=None) -> dict:
             }
         )
 
+    timings["fundamentals+features"] = round(time.perf_counter() - _t_fund, 1)
     scored = score_all(features, cfg, regime)
 
     # market breadth over the scored universe
@@ -198,5 +220,5 @@ def run_scan(positions: list[dict] | None = None, session=None) -> dict:
     provider_names = {"price": price.name, "fundamental": fund.name}
     return build_results(
         regime, scored, universe_stats, enriched_positions, provider_names, cfg, breadth,
-        hist=hist, held=held, session=session,
+        hist=hist, held=held, session=session, timings=timings,
     )
