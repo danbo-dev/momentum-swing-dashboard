@@ -64,10 +64,13 @@ the secret stops being a manual step.
   dashboard's **Export / More ▾**; the download is named `positions.json` — rename it to
   **`book_export.json`** in the repo root. It is gitignored (it holds P&L), so **CI cannot see it**;
   that is what `HELD_TICKERS` exists for.
-- **No node/npm on this machine.** Engine tests run (`python -m pytest engine/tests`, needs the
-  `.venv`); nothing in `web/` can be typechecked locally. The `web` workflow runs
-  `npm ci && npm run build` on every `web/**` push so TypeScript is still verified — check the
-  commit status rather than building locally.
+- **Toolchain (as of 2026-07-26):** Homebrew at `/opt/homebrew`, Node 26 / npm 11 via
+  `brew install node`. Python deps for the engine live in the repo's `.venv`.
+  - engine: `. .venv/bin/activate && python -m pytest engine/tests -q`
+  - web: `cd web && npm ci && npm run build` (`next build` typechecks, so this is the typecheck)
+  - The `web` workflow runs the same build on every `web/**` push, so CI covers it either way.
+  - Non-login shells may not have brew on PATH; prefix with
+    `eval "$(/opt/homebrew/bin/brew shellenv zsh)"` if `node` isn't found.
 - `python -m engine` on synthetic data does **not** finish quickly — it reaches for network. Test
   engine changes with targeted unit calls, not a full scan.
 - **Judge strategy performance on `kind: "paper"` trades only.** The `real` lots are a migrated
