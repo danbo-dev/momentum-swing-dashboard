@@ -86,6 +86,18 @@ export default async function Page() {
           </div>
         </div>
         <div className="row" style={{ gap: 10 }}>
+          {r.as_of?.session && (
+            <span
+              className={`badge ${r.as_of.current === false ? "status-warning" : ""}`}
+              title={
+                r.as_of.current === false
+                  ? `These are ${r.as_of.session} closes — a newer session has since completed.`
+                  : `Prices are the ${r.as_of.session} close (${r.as_of.pct_on_session}% of quoted names).`
+              }
+            >
+              closes {r.as_of.session}
+            </span>
+          )}
           <span className="muted" style={{ fontSize: 12 }}><UpdatedAt iso={r.generated_at} /></span>
           <ThemeToggle />
         </div>

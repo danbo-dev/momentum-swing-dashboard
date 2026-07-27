@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import pandas as pd
 
 from .indicators import atr, ema, rsi
+from .session import session_is_current
 
 SCHEMA_VERSION = 2
 
@@ -77,6 +78,7 @@ def build_results(
     breadth: dict | None = None,
     hist: dict | None = None,
     held: set | None = None,
+    session=None,
 ) -> dict:
     s = cfg["signals"]
     # top_n by score, PLUS every qualifying reversal setup (they rank lower on the
@@ -117,9 +119,22 @@ def build_results(
             market[tk] = _unscored_quote(df, cfg)
         except Exception:  # never let one holding break the whole payload
             continue
+    # Self-describing output: say which session these prices are FOR, and how well the
+    # data actually matches it. `generated_at` alone hid a two-hour price blend for
+    # weeks — a payload that states its own as-of makes that failure loud instead.
+    bar_dates = [q["asof"] for q in market.values() if q.get("asof")]
+    on_session = sum(1 for d in bar_dates if session and d == session.isoformat())
+    session_block = {
+        "session": session.isoformat() if session else None,
+        "names_on_session": on_session,
+        "names_quoted": len(bar_dates),
+        "pct_on_session": round(on_session / len(bar_dates) * 100, 1) if bar_dates else None,
+        "current": session_is_current(session) if session else None,
+    }
     return {
         "schema_version": SCHEMA_VERSION,
         "generated_at": datetime.now(timezone.utc).isoformat(),
+        "as_of": session_block,
         "providers": provider_names,
         "strategy": {
             "name": "Momentum + catalysts (quality-gated)",

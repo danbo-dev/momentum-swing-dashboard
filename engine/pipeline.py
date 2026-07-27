@@ -9,6 +9,7 @@ from .config import load_config
 from .data import get_fundamental_provider, get_price_provider
 from .indicators import rsi
 from .results import build_results, change_pct, spark
+from .session import resolve_session, session_is_current
 from .strategy.catalysts import catalyst_score
 from .strategy.momentum import high_proximity01, raw_momentum
 from .strategy.positions import exit_signals
@@ -25,9 +26,13 @@ from .strategy.universe import (
 )
 
 
-def run_scan(positions: list[dict] | None = None) -> dict:
+def run_scan(positions: list[dict] | None = None, session=None) -> dict:
     cfg = load_config()
-    price = get_price_provider()
+    # Resolve the trading session ONCE and thread it through every fetch. A cold run
+    # takes ~2h on the free tier; without this it straddles the close and mixes
+    # intraday snapshots with real closes. See engine/session.py.
+    session = session or resolve_session()
+    price = get_price_provider(session=session)
     fund = get_fundamental_provider()
 
     benchmark = cfg["market_regime"]["benchmark"]
@@ -193,5 +198,5 @@ def run_scan(positions: list[dict] | None = None) -> dict:
     provider_names = {"price": price.name, "fundamental": fund.name}
     return build_results(
         regime, scored, universe_stats, enriched_positions, provider_names, cfg, breadth,
-        hist=hist, held=held,
+        hist=hist, held=held, session=session,
     )

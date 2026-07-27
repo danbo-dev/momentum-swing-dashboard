@@ -1,12 +1,22 @@
 name: engine
 
-# Scheduled scans. GitHub cron is best-effort (can lag 20-40 min at :00), so we
-# use odd minutes. Times are UTC; US market close 16:00 ET = 20:00 UTC (EDT) /
-# 21:00 UTC (EST). We run ~40 min after the EDT close and once midday.
+# ONE scan per trading session, after the close.
+#
+# 21:15 UTC is post-close in BOTH EDT (17:15 ET) and EST (16:15 ET), so the schedule
+# survives the DST change instead of relying on runner lag to save it. GitHub cron is
+# best-effort and has been running ~60 min late, so expect a ~22:15 UTC start; a cold
+# run takes ~2h on Polygon's free tier, so data lands ~20:30 ET — ready for a next-
+# morning review.
+#
+# The old 17:07 UTC "midday check" is gone. It could never do what its name implied:
+# get_recent_bars only reads COMPLETED sessions, so a midday run produced the same
+# frame as the previous evening. Worse, it took ~2h and straddled the close, caching a
+# mix of intraday and closing prices that the post-close run then reused. Pinned
+# sessions (engine/session.py) make that impossible now, but the run still had no
+# reason to exist.
 on:
   schedule:
-    - cron: "37 20 * * 1-5"   # ~40 min after the 16:00 ET close (EDT)
-    - cron: "7 17 * * 1-5"    # ~13:00 ET midday check
+    - cron: "15 21 * * 1-5"   # post-close year-round (17:15 ET EDT / 16:15 ET EST)
   workflow_dispatch: {}       # manual "Run workflow" button
 
 concurrency:

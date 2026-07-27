@@ -12,6 +12,7 @@ from datetime import date, timedelta
 import pandas as pd
 
 from ..config import env, load_config
+from ..session import resolve_session
 from .base import PriceProvider, TickerMeta
 from ._http import RateLimiter, cached_get
 
@@ -24,11 +25,18 @@ _ETF_TYPES = {"ETF", "ETN", "ETV"}
 class PolygonProvider(PriceProvider):
     name = "polygon"
 
-    def __init__(self):
+    def __init__(self, session: date | None = None):
         cfg = load_config()["data"]
         self._key = env("POLYGON_API_KEY")
         self._limiter = RateLimiter(cfg["polygon"]["rate_limit_per_min"])
         self._ttl = cfg["cache_ttl_hours"]
+        # The session every fetch in this run is about. Resolved once so a long run
+        # cannot straddle the close and blend intraday snapshots with real closes.
+        self._session = session or resolve_session()
+
+    @property
+    def session(self) -> date:
+        return self._session
 
     def get_universe(self) -> list[TickerMeta]:
         full = load_config()["data"]["polygon"]
@@ -74,7 +82,9 @@ class PolygonProvider(PriceProvider):
         """
         url = f"{BASE}/v2/aggs/grouped/locale/us/market/stocks/{day.isoformat()}"
         params = {"adjusted": "true", "apiKey": self._key}
-        ttl = self._ttl if day >= date.today() else 24 * 365  # past days never change
+        # Sessions older than the pinned one are immutable; the pinned session itself
+        # may still be settling, so it keeps the short TTL.
+        ttl = self._ttl if day >= self._session else 24 * 365
         try:
             data = cached_get(url, params, self._limiter, ttl,
                               cache_key=f"poly_grouped_{day.isoformat()}")
@@ -96,13 +106,14 @@ class PolygonProvider(PriceProvider):
         assembled from grouped-daily calls. Columns:
         ticker, date, open, high, low, close, volume.
 
-        Walks back from yesterday (completed sessions only, so both the midday
-        and post-close runs see the same EOD frame and no partial bars leak in).
-        Weekends are skipped without a call; holidays return empty and are
-        skipped too. Steady-state cost is ~1 new grouped call per trading day.
+        Walks back from the run's pinned session — completed sessions only, so no
+        partial bars leak in and the frame is identical no matter when the run fires
+        or how long it takes. Weekends are skipped without a call; holidays return
+        empty and are skipped too. Steady-state cost is ~1 new grouped call per
+        trading day.
         """
         rows: list[tuple] = []
-        d = date.today() - timedelta(days=1)
+        d = self._session
         seen = 0
         scanned = 0
         while seen < days and scanned < days * 2 + 15:  # calendar pad for weekends/holidays
@@ -120,14 +131,21 @@ class PolygonProvider(PriceProvider):
         )
 
     def get_history(self, tickers: list[str], days: int) -> dict[str, pd.DataFrame]:
-        to = date.today()
+        # Range ENDS at the pinned session, and the cache key names that session.
+        # Keying on date.today() was the bug: a run spanning the close cached some
+        # tickers mid-session and some at the close under one key, and the next run
+        # reused the blend for up to cache_ttl_hours.
+        to = self._session
         frm = to - timedelta(days=int(days * 1.5) + 10)  # calendar pad for weekends/holidays
         out: dict[str, pd.DataFrame] = {}
         for tk in tickers:
             url = f"{BASE}/v2/aggs/ticker/{tk}/range/1/day/{frm}/{to}"
             params = {"adjusted": "true", "sort": "asc", "limit": 50000, "apiKey": self._key}
             try:
-                data = cached_get(url, params, self._limiter, self._ttl,
+                # A completed session's bars never change, so cache them effectively
+                # forever; only an unresolved (future/partial) range needs a short TTL.
+                ttl = 24 * 365 if to < date.today() else self._ttl
+                data = cached_get(url, params, self._limiter, ttl,
                                   cache_key=f"poly_hist_{tk}_{to}")
             except Exception:
                 continue

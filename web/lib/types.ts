@@ -158,6 +158,15 @@ export interface PositionExit {
 export interface Results {
   schema_version: number;
   generated_at: string;
+  /** Which trading session these prices are FOR — distinct from when the scan ran.
+   *  A ~2h scan used to straddle the close and blend sessions; this states the answer. */
+  as_of?: {
+    session: string | null;
+    names_on_session: number;
+    names_quoted: number;
+    pct_on_session: number | null;
+    current: boolean | null;
+  };
   providers: { price: string; fundamental: string };
   strategy: { name: string; horizon: string; factor_weights: Record<string, number> };
   market_regime: MarketRegime;
