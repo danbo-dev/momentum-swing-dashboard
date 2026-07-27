@@ -39,6 +39,14 @@ export interface Quote {
   emaSlow?: number;
   atr?: number;
   rsi?: number;
+  /** Session low — a dip through the trail that closes back above it is still a
+   *  breach, and a close-only comparison never sees it. */
+  low?: number;
+  high?: number;
+  /** Date of the bar this quote came from (yyyy-mm-dd). */
+  asOf?: string;
+  /** Held but not ranked: failed a gate or fell out of the funnel bucket. */
+  unscored?: boolean;
 }
 
 export interface PaperLot {
@@ -53,6 +61,15 @@ export interface PaperLot {
   stop?: number; // initial hard stop, for R-multiple
   target?: number;
   lastMark?: number; // last observed price (for stale display)
+  /** Bar date `lastMark` came from — lets the UI say how old a frozen price is. */
+  lastMarkDate?: string;
+  /** Latched trailing-stop breach: set the first time an observed price (or session
+   *  low) trades through the stop, and NOT cleared if the name recovers. In `alert`
+   *  stopMode nothing auto-sells, so a breach seen on a day you didn't check would
+   *  otherwise vanish from the UI entirely. Cleared only by an explicit acknowledge. */
+  breachedAt?: string;
+  breachPrice?: number;
+  breachLevel?: number;
   note?: string;
 }
 
@@ -130,6 +147,44 @@ function daysBetween(a: string, b: string): number {
 /** Trailing-stop level off the high-water mark (matches engine positions.py). */
 export function stopLevel(lot: Pick<PaperLot, "highWatermark" | "trailPct">): number {
   return lot.highWatermark * (1 - lot.trailPct / 100);
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+/** A lot whose displayed price is frozen: the engine stopped quoting it (it fell out
+ *  of the scan), so `lastMark` is older than the scan itself. Returns the staleness in
+ *  days, or 0 when the mark is current. */
+export function markStaleDays(lot: PaperLot, scanDate?: string): number {
+  if (!lot.lastMarkDate || !scanDate) return 0;
+  const ms = Date.parse(scanDate) - Date.parse(lot.lastMarkDate);
+  return ms > 0 ? Math.floor(ms / 86_400_000) : 0;
+}
+
+/** Latched trailing-stop breach, if one was ever observed and not yet acknowledged. */
+export function stopBreach(
+  lot: PaperLot,
+): { at: string; price: number; level: number } | null {
+  if (!lot.breachedAt) return null;
+  return {
+    at: lot.breachedAt,
+    price: lot.breachPrice ?? lot.lastMark ?? lot.entryPrice,
+    level: lot.breachLevel ?? stopLevel(lot),
+  };
+}
+
+/** Dismiss a breach flag — the user has seen it and chosen to hold. Re-arms detection,
+ *  so a later dip through the (possibly higher) trail flags again. */
+export function acknowledgeBreach(acc: PaperAccount, lotId: string): PaperAccount {
+  return {
+    ...acc,
+    lots: acc.lots.map((l) =>
+      l.id === lotId
+        ? { ...l, breachedAt: undefined, breachPrice: undefined, breachLevel: undefined }
+        : l,
+    ),
+  };
 }
 
 export type StopColor = "green" | "yellow" | "orange" | "red";
@@ -294,15 +349,34 @@ export function applyMarks(
   for (const lot of acc.lots) {
     const q = quotes[lot.ticker];
     if (!q) {
+      // No quote: leave the lot untouched. `lastMarkDate` is what tells the UI the
+      // displayed price is frozen — never silently present a stale mark as current.
       lots.push(lot);
       continue;
     }
     const price = q.price;
     const hwm = Math.max(lot.highWatermark, price);
-    const marked: PaperLot = { ...lot, highWatermark: hwm, lastMark: price };
+    const marked: PaperLot = {
+      ...lot,
+      highWatermark: hwm,
+      lastMark: price,
+      lastMarkDate: q.asOf ?? date,
+    };
     if (hwm !== lot.highWatermark || price !== lot.lastMark) changed = true;
+
+    // Breach is judged against the stop that was actually in force during the bar —
+    // i.e. before this mark ratchets the high-water up. Using the post-ratchet level
+    // would let a wide-range up day manufacture a breach against its own new high.
+    const level = stopLevel(lot);
+    const trough = Math.min(price, q.low ?? price);
+    if (trough <= level && !lot.breachedAt) {
+      marked.breachedAt = q.asOf ?? date;
+      marked.breachPrice = round2(trough);
+      marked.breachLevel = round2(level);
+      changed = true;
+    }
+
     if (acc.stopMode === "auto") {
-      const level = stopLevel(marked);
       if (price <= level) {
         closed.push(realizedTrade(marked, marked.shares, level, date, "trailing_stop"));
         if (marked.kind === "paper") cash += marked.shares * level;

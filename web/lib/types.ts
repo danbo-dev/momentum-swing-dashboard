@@ -178,6 +178,13 @@ export interface MarketRow {
   ema_slow: number;
   atr: number;
   rsi: number;
+  /** Session low/high and bar date — present from schema 2 onward. `low` is what
+   *  makes an intraday stop breach detectable when the bar closes back above it. */
+  low?: number;
+  high?: number;
+  asof?: string;
+  /** Quoted because it is held, not because it scored (failed a gate / left the bucket). */
+  unscored?: boolean;
 }
 
 export interface SnapshotItem {

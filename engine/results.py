@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 import pandas as pd
 
-from .indicators import ema
+from .indicators import atr, ema, rsi
 
 SCHEMA_VERSION = 2
 
@@ -31,6 +31,42 @@ def change_pct(close: pd.Series, bars: int) -> float:
     return round(float(close.iloc[-1] / close.iloc[-1 - bars] - 1) * 100, 2)
 
 
+def _bar_context(df: pd.DataFrame | None) -> dict:
+    """Session low/high + the bar's date, so the UI can detect an intraday stop breach
+    that a close-only comparison misses (a dip through the trail that closes back above
+    it is still a breach)."""
+    if df is None or df.empty:
+        return {}
+    return {
+        "low": round(float(df["low"].iloc[-1]), 2),
+        "high": round(float(df["high"].iloc[-1]), 2),
+        "asof": df.index[-1].strftime("%Y-%m-%d"),
+    }
+
+
+def _unscored_quote(df: pd.DataFrame, cfg: dict) -> dict:
+    """Minimal market entry for a HELD name that never reached `scored` (failed the
+    liquidity or quality gate, or fell out of the funnel bucket).
+
+    Without this the UI has no quote for the position and silently falls back to a
+    frozen `lastMark` — which also freezes its trailing stop. A name you own dropping
+    out of the screen is exactly when you most need it marked, so quote it anyway and
+    tag it `unscored` so the UI can say why it isn't ranked.
+    """
+    close = df["close"]
+    t = cfg["factors"]["trigger"]
+    q = {
+        "price": round(float(close.iloc[-1]), 2),
+        "ema_fast": round(float(ema(close, t["ema_fast"]).iloc[-1]), 2),
+        "ema_slow": round(float(ema(close, t["ema_slow"]).iloc[-1]), 2),
+        "atr": round(float(atr(df["high"], df["low"], close, cfg["risk"]["atr_period"]).iloc[-1]), 3),
+        "rsi": round(float(rsi(close, 14).iloc[-1]), 1),
+        "unscored": True,
+    }
+    q.update(_bar_context(df))
+    return q
+
+
 def build_results(
     regime: dict,
     scored: list[dict],
@@ -39,6 +75,8 @@ def build_results(
     provider_names: dict,
     cfg: dict,
     breadth: dict | None = None,
+    hist: dict | None = None,
+    held: set | None = None,
 ) -> dict:
     s = cfg["signals"]
     # top_n by score, PLUS every qualifying reversal setup (they rank lower on the
@@ -53,17 +91,32 @@ def build_results(
     # Last-value indicators for every scored name (no extra computation/API calls)
     # so the web UI can grade exits for any scanned holding, not just the top_n
     # opportunities. Mirrors the fields web/lib/exitSignals.ts::MarketData expects.
-    market = {
-        x["ticker"]: {
+    hist = hist or {}
+    market = {}
+    for x in scored:
+        if not (x.get("spark", {}).get("ema_fast") and x.get("risk")):
+            continue
+        q = {
             "price": x["price"],
             "ema_fast": round(float(x["spark"]["ema_fast"][-1]), 2),
             "ema_slow": round(float(x["spark"]["ema_slow"][-1]), 2),
             "atr": x["risk"]["atr"],
             "rsi": x["rsi"],
         }
-        for x in scored
-        if x.get("spark", {}).get("ema_fast") and x.get("risk")
-    }
+        q.update(_bar_context(hist.get(x["ticker"])))
+        market[x["ticker"]] = q
+
+    # Held names that failed a gate are missing from `scored` — quote them anyway.
+    for tk in sorted(held or set()):
+        if tk in market:
+            continue
+        df = hist.get(tk)
+        if df is None or df.empty:
+            continue
+        try:
+            market[tk] = _unscored_quote(df, cfg)
+        except Exception:  # never let one holding break the whole payload
+            continue
     return {
         "schema_version": SCHEMA_VERSION,
         "generated_at": datetime.now(timezone.utc).isoformat(),

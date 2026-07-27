@@ -1,0 +1,44 @@
+name: web
+
+# Typechecks + builds the dashboard on every push that touches web/. Exists so the
+# TypeScript can be verified without a local node install — GitHub runs it and the
+# commit gets a green check or a red X with the compiler error.
+#
+# This repo is public, so Actions minutes are unlimited; the path filter keeps it
+# from firing on the engine's twice-daily data commits anyway.
+on:
+  push:
+    paths:
+      - "web/**"
+      - ".github/workflows/web.yml"
+  pull_request:
+    paths:
+      - "web/**"
+  workflow_dispatch: {}
+
+concurrency:
+  group: web-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install deps
+        run: npm ci
+
+      # `next build` typechecks as part of the build, so this catches both type
+      # errors and anything that breaks the production bundle.
+      - name: Build (typechecks)
+        run: npm run build

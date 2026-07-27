@@ -49,6 +49,11 @@ jobs:
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
           TIINGO_API_KEY: ${{ secrets.TIINGO_API_KEY }}
           CONTEXT_UNIVERSE_LIMIT: ${{ vars.CONTEXT_UNIVERSE_LIMIT }}
+          # Held tickers, so the scan force-includes and always quotes them. A
+          # holding that drops out of the screen otherwise freezes at a stale price
+          # in the dashboard — and its trailing stop freezes with it. A secret, not
+          # a var: this repo is public and the list is the user's positions.
+          HELD_TICKERS: ${{ secrets.HELD_TICKERS }}
         run: |
           python -m engine
           python -m engine.backtest

@@ -192,5 +192,6 @@ def run_scan(positions: list[dict] | None = None) -> dict:
 
     provider_names = {"price": price.name, "fundamental": fund.name}
     return build_results(
-        regime, scored, universe_stats, enriched_positions, provider_names, cfg, breadth
+        regime, scored, universe_stats, enriched_positions, provider_names, cfg, breadth,
+        hist=hist, held=held,
     )

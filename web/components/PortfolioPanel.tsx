@@ -11,6 +11,7 @@ import {
   currentPrice,
   exportJSON,
   isStale,
+  stopBreach,
   stopGrade,
   type KindFilter,
   type PaperLot,
@@ -72,6 +73,10 @@ function PositionRow({ lot }: { lot: PaperLot }) {
   const rNow = risk && risk > 0 ? (price - lot.entryPrice) / risk : null;
 
   const g0 = stopGrade(price, lot);
+  // A breach observed on any earlier bar, including an intraday dip that closed back
+  // above the trail. Latched, so it survives days when the dashboard isn't opened —
+  // and it is judged on real bars, never on a frozen mark.
+  const breach = stopBreach(lot);
   const exit = computeExitSignals(marketData(lot, quotes), lot.entryPrice, lot.highWatermark, lot.trailPct);
   const urgency: ExitGrade = exit ? exit.urgency : { color: g0.color, label: g0.label };
   const hit = g0.color === "red";
@@ -94,7 +99,18 @@ function PositionRow({ lot }: { lot: PaperLot }) {
         <td className="tnum">{money(lot.entryPrice)}</td>
         <td className="tnum">
           {money(price)}{" "}
-          {stale && <span className="badge status-warning" title="No price in the latest scan — last known mark">stale</span>}
+          {stale && (
+            <span
+              className="badge status-warning"
+              title={
+                lot.lastMarkDate
+                  ? `Not priced in the latest scan — this is the ${lot.lastMarkDate} close, not today's`
+                  : "No price in the latest scan — last known mark"
+              }
+            >
+              stale{lot.lastMarkDate ? ` · ${lot.lastMarkDate}` : ""}
+            </span>
+          )}
         </td>
         <td className="tnum">{money(mkt)}</td>
         <td className={`tnum ${unreal >= 0 ? "pos" : "neg"}`}>
@@ -103,8 +119,19 @@ function PositionRow({ lot }: { lot: PaperLot }) {
         <td className="tnum">{rMult(rNow)}</td>
         <td className="l">
           <span className={`badge ${statusClass[urgency.color]}`}>{urgency.label}</span>
+          {breach && (
+            <div style={{ marginTop: 2 }}>
+              <span
+                className="badge status-critical"
+                title={`Traded through ${money(breach.level)} on ${breach.at} (low ${money(breach.price)}). Flag stays until you sell or dismiss it — even if the price recovered.`}
+              >
+                ⚠ trail exceeded · {breach.at}
+              </span>
+            </div>
+          )}
           <div className="muted tnum" style={{ fontSize: 11, marginTop: 2 }}>
             stop {money(g0.level)} · {g0.cushionPct >= 0 ? "+" : ""}{g0.cushionPct.toFixed(1)}%
+            {stale && " (vs stale price)"}
           </div>
         </td>
         <td className="l" onClick={(e) => e.stopPropagation()}>

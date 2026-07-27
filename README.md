@@ -56,3 +56,32 @@ pytest engine/tests -q
 Providers are chosen automatically: real keys → Polygon/Finnhub, otherwise
 synthetic. On the Polygon free tier (5 calls/min) cap the universe with
 `CONTEXT_UNIVERSE_LIMIT` while testing.
+
+## Held positions (`HELD_TICKERS`) — keep this current
+
+The scan force-includes held tickers and **always quotes them, even if they fail a
+gate or fall out of the screen**. Without that, a holding the screen drops has no
+price in `results.json`, the dashboard silently falls back to the last mark it saw,
+and the trailing stop freezes along with it — showing a healthy cushion against a
+stale price.
+
+Holdings live in browser localStorage, which CI cannot read, so the scheduled run
+learns them from a `HELD_TICKERS` **repository secret** (a secret, not a variable —
+in a public repo the value is your positions):
+
+```bash
+gh secret set HELD_TICKERS --body "AAA,BBB,CCC"
+# or: Settings -> Secrets and variables -> Actions
+```
+
+**This does not update itself.** Re-set it whenever the book changes — after a buy,
+a sell, or a trim. A sold name left in the list only wastes a quote, but a *new*
+holding left out reintroduces the stale-price bug. Locally, `python -m engine` reads
+`data/positions.json`, then a `book_export.json` in the repo root (gitignored), then
+`$HELD_TICKERS` — first non-empty wins.
+
+## CI
+
+- **`engine`** — scheduled scans, commits refreshed JSON back to the repo.
+- **`web`** — `npm ci && npm run build` on every `web/**` push. `next build`
+  typechecks, so this verifies TypeScript without a local Node install.
