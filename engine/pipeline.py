@@ -40,6 +40,32 @@ def _stage(timings: dict, name: str):
         timings[name] = round(time.perf_counter() - t0, 1)
 
 
+def enrich_positions(positions, hist: dict, meta_by: dict, cfg: dict) -> list[dict]:
+    """Attach name/sector, and an exit grade where one is computable.
+
+    Position sources are not uniform. `positions.json` and a `book_export.json` lot
+    carry a cost basis; a `$HELD_TICKERS` entry is only "always quote this name" and
+    has no entry price. An exit grade measures from an entry, so it is skipped rather
+    than faked — the ticker is still force-included and quoted, which is the point of
+    listing it.
+    """
+    out = []
+    for p in positions or []:
+        tk = p.get("ticker")
+        df = hist.get(tk)
+        item = dict(p)
+        if df is not None and not df.empty:
+            m = meta_by.get(tk)
+            item["name"] = m.name if m else tk
+            item["sector"] = m.sector if m else "—"
+            entry = p.get("entry_price")
+            if entry:
+                hw = p.get("high_watermark") or entry
+                item["exit"] = exit_signals(df, float(entry), float(hw), cfg)
+        out.append(item)
+    return out
+
+
 def run_scan(positions: list[dict] | None = None, session=None) -> dict:
     cfg = load_config()
     timings: dict[str, float] = {}
@@ -203,19 +229,7 @@ def run_scan(positions: list[dict] | None = None, session=None) -> dict:
         "quality_dropped": quality_dropped,
         "funnel": funnel_stats,           # None in legacy (seed/synthetic) mode
     }
-    # enrich held positions with exit signals
-    enriched_positions = []
-    for p in positions or []:
-        tk = p.get("ticker")
-        df = hist.get(tk)
-        item = dict(p)
-        if df is not None and not df.empty:
-            hw = p.get("high_watermark", p.get("entry_price", 0))
-            item["exit"] = exit_signals(df, p["entry_price"], hw, cfg)
-            m = meta_by.get(tk)
-            item["name"] = m.name if m else tk
-            item["sector"] = m.sector if m else "—"
-        enriched_positions.append(item)
+    enriched_positions = enrich_positions(positions, hist, meta_by, cfg)
 
     provider_names = {"price": price.name, "fundamental": fund.name}
     return build_results(
