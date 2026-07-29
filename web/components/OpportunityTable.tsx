@@ -104,12 +104,25 @@ export default function OpportunityTable({ rows }: { rows: Opportunity[] }) {
 }
 
 function FragmentRow({ o, isOpen, onToggle }: { o: Opportunity; isOpen: boolean; onToggle: () => void }) {
-  const { openBuy } = usePaper();
+  const { openBuy, account } = usePaper();
+  // The engine has no idea what you own — the book lives in localStorage, and `held`
+  // tickers are force-INCLUDED in the scan so they stay quoted. So a name you already
+  // hold keeps ranking here, with a Buy button and nothing saying you own it.
+  const heldShares = account.lots
+    .filter((l) => l.ticker === o.ticker)
+    .reduce((a, l) => a + l.shares, 0);
   return (
     <>
       <tr className="rowbtn" onClick={onToggle}>
         <td className="l">
-          <div style={{ fontWeight: 650 }}>{o.ticker} {isOpen ? "▾" : "▸"}</div>
+          <div style={{ fontWeight: 650 }}>
+            {o.ticker} {isOpen ? "▾" : "▸"}{" "}
+            {heldShares > 0 && (
+              <span className="badge watch" title={`You already hold ${heldShares} shares. Ranking here does not mean "buy more".`}>
+                held
+              </span>
+            )}
+          </div>
           <div className="muted" style={{ fontSize: 11 }}>{o.sector}</div>
         </td>
         <td className="tnum">{money(o.price)}</td>
@@ -158,14 +171,15 @@ function FragmentRow({ o, isOpen, onToggle }: { o: Opportunity; isOpen: boolean;
               <div>
                 <RewardRiskGauge risk={o.risk} />
                 <button
-                  className="btn primary sm"
+                  className={`btn sm ${heldShares > 0 ? "" : "primary"}`}
                   style={{ marginTop: 10 }}
+                  title={heldShares > 0 ? `Already holding ${heldShares} shares — this would add to the position.` : undefined}
                   onClick={(e) => {
                     e.stopPropagation();
                     openBuy({ ticker: o.ticker, price: o.price, risk: o.risk, name: o.name });
                   }}
                 >
-                  ＋ Log Buy {o.ticker}
+                  {heldShares > 0 ? `＋ Add to ${o.ticker} (${heldShares} held)` : `＋ Log Buy ${o.ticker}`}
                 </button>
               </div>
 

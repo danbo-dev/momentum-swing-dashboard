@@ -161,7 +161,18 @@ data:
     use_seed_universe: false       # false => broad whole-market funnel (Stages 0-3);
                                    # true  => curated 79-name seed (offline/fallback default)
   finnhub:
-    rate_limit_per_min: 60
+    # Free tier is 60/min. Sitting exactly ON the limit trips 429s, and _http.py
+    # then backs off 5/10/20/40s — far more costly than the spacing it saves.
+    rate_limit_per_min: 55
+    # Per-endpoint cache lifetimes. Fundamentals dominate runtime (~95% of a cold
+    # scan) purely because ONE global TTL refetched everything daily, including
+    # facts that change quarterly or never. Cache by how fast the data actually
+    # moves, not by how often we happen to run.
+    ttl_hours:
+      earnings: 20         # calendar dates get revised; refresh each run-day
+      recommendation: 72   # analyst buckets are monthly; 3 days is ample
+      financials: 168      # quarterly reports — a week is still conservative
+      profile: 720         # sector/industry is effectively static (30 days)
 
 # ---------------------------------------------------------------------------
 # BACKTEST

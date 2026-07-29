@@ -23,11 +23,16 @@ class FinnhubProvider(FundamentalProvider):
         self._key = env("FINNHUB_API_KEY")
         self._limiter = RateLimiter(cfg["finnhub"]["rate_limit_per_min"])
         self._ttl = cfg["cache_ttl_hours"]
+        # Per-endpoint lifetimes; falls back to the global TTL for anything unlisted.
+        self._ttls = cfg["finnhub"].get("ttl_hours", {}) or {}
         self._today = date.today()
 
-    def _get(self, path: str, params: dict, key: str) -> dict:
+    def _get(self, path: str, params: dict, key: str, kind: str | None = None) -> dict:
+        """`kind` selects a per-endpoint TTL (see config data.finnhub.ttl_hours).
+        Omitting it keeps the conservative global TTL."""
         params = {**params, "token": self._key}
-        return cached_get(f"{BASE}{path}", params, self._limiter, self._ttl, cache_key=key)
+        ttl = self._ttls.get(kind, self._ttl) if kind else self._ttl
+        return cached_get(f"{BASE}{path}", params, self._limiter, ttl, cache_key=key)
 
     def get_earnings(self, tickers: list[str]) -> dict[str, Earnings]:
         # one calendar call covers all symbols in the forward window
@@ -39,6 +44,7 @@ class FinnhubProvider(FundamentalProvider):
                 "/calendar/earnings",
                 {"from": str(frm), "to": str(to)},
                 key=f"fh_earn_cal_{frm}",
+                kind="earnings",
             )
         except Exception:
             data = {}
@@ -73,7 +79,8 @@ class FinnhubProvider(FundamentalProvider):
     def get_recommendation(self, ticker: str) -> Recommendation:
         try:
             data = self._get(
-                "/stock/recommendation", {"symbol": ticker}, key=f"fh_rec_{ticker}"
+                "/stock/recommendation", {"symbol": ticker},
+                key=f"fh_rec_{ticker}", kind="recommendation",
             )
         except Exception:
             return Recommendation()
@@ -94,7 +101,8 @@ class FinnhubProvider(FundamentalProvider):
     def get_financials(self, ticker: str) -> Financials:
         try:
             data = self._get(
-                "/stock/metric", {"symbol": ticker, "metric": "all"}, key=f"fh_metric_{ticker}"
+                "/stock/metric", {"symbol": ticker, "metric": "all"},
+                key=f"fh_metric_{ticker}", kind="financials",
             )
         except Exception:
             return Financials()
@@ -111,7 +119,10 @@ class FinnhubProvider(FundamentalProvider):
         """Industry label from the company profile — used to give broad-universe
         names a sector for the heatmap when the price list has none."""
         try:
-            data = self._get("/stock/profile2", {"symbol": ticker}, key=f"fh_profile_{ticker}")
+            data = self._get(
+                "/stock/profile2", {"symbol": ticker},
+                key=f"fh_profile_{ticker}", kind="profile",
+            )
         except Exception:
             return None
         return (data or {}).get("finnhubIndustry") or None

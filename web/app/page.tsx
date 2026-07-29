@@ -7,6 +7,7 @@ import SectorHeatmap from "@/components/SectorHeatmap";
 import BacktestPanel from "@/components/BacktestPanel";
 import OpportunityTable from "@/components/OpportunityTable";
 import PaperProvider from "@/components/PaperProvider";
+import Collapsible from "@/components/Collapsible";
 import PortfolioPanel from "@/components/PortfolioPanel";
 import MetricsGlossary from "@/components/MetricsGlossary";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -116,36 +117,41 @@ export default async function Page() {
 
       <StatTiles r={r} />
 
-      <div className="grid2" style={{ marginTop: 16 }}>
-        <RegimePanel regime={r.market_regime} breadth={r.breadth} />
-        <SectorHeatmap snapshot={r.snapshot} />
-      </div>
-
+      {/* Positions first: it is the thing checked most often, and it used to sit
+          behind 40 opportunity rows. Every section collapses and remembers its state. */}
       <PaperProvider quotes={quotes} seedReal={seedReal}>
-        <section style={{ marginTop: 20 }}>
-          <div className="row spread" style={{ marginBottom: 10 }}>
-            <h2 style={{ fontSize: 16 }}>Opportunities <span className="muted">({r.opportunities.length})</span></h2>
-            <span className="muted" style={{ fontSize: 12 }}>click a row for the full thesis · Log Buy inside</span>
-          </div>
+        <Collapsible id="positions" title="Positions">
+          <PortfolioPanel />
+        </Collapsible>
+
+        <Collapsible
+          id="opportunities"
+          title="Opportunities"
+          count={r.opportunities.length}
+          right={<span className="muted" style={{ fontSize: 12 }}>click a row for the full thesis · Log Buy inside</span>}
+        >
           {r.opportunities.length ? (
             <OpportunityTable rows={r.opportunities} />
           ) : (
-            <div className="card muted">No names cleared the watch threshold in this scan.</div>
+            <div className="muted">No names cleared the watch threshold in this scan.</div>
           )}
-        </section>
-
-        <section style={{ marginTop: 20 }}>
-          <PortfolioPanel />
-        </section>
+        </Collapsible>
       </PaperProvider>
 
-      <section style={{ marginTop: 20 }}>
-        <BacktestPanel bt={bt} />
-      </section>
+      <Collapsible id="market" title="Market &amp; sectors">
+        <div className="grid2">
+          <RegimePanel regime={r.market_regime} breadth={r.breadth} />
+          <SectorHeatmap snapshot={r.snapshot} />
+        </div>
+      </Collapsible>
 
-      <section style={{ marginTop: 20 }}>
+      <Collapsible id="backtest" title="Backtest" defaultOpen={false}>
+        <BacktestPanel bt={bt} />
+      </Collapsible>
+
+      <Collapsible id="glossary" title="Metrics glossary" defaultOpen={false}>
         <MetricsGlossary weights={r.strategy.factor_weights} />
-      </section>
+      </Collapsible>
 
       <footer className="muted" style={{ marginTop: 30, fontSize: 12 }}>
         Data: {r.providers.price} / {r.providers.fundamental}. Decision-support only —
