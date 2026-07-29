@@ -122,10 +122,16 @@ function PositionRow({ lot }: { lot: PaperLot }) {
           {breach && (
             <div style={{ marginTop: 2 }}>
               <span
-                className="badge status-critical"
-                title={`Traded through ${money(breach.level)} on ${breach.at} (low ${money(breach.price)}). Flag stays until you sell or dismiss it — even if the price recovered.`}
+                className={`badge ${breach.intraday ? "status-warning" : "status-critical"}`}
+                title={
+                  breach.intraday
+                    ? `On ${breach.at} the low (${money(breach.price)}) dipped under the ${money(breach.level)} stop, but the close held above it. Auto-close fires on closes, so nothing was sold — this is a heads-up, not a pending sale.`
+                    : `Closed at or below the ${money(breach.level)} stop on ${breach.at}.`
+                }
               >
-                ⚠ trail exceeded · {breach.at}
+                {breach.intraday
+                  ? `dipped under stop · ${breach.at}`
+                  : `⚠ closed below stop · ${breach.at}`}
               </span>
             </div>
           )}

@@ -70,6 +70,10 @@ export interface PaperLot {
   breachedAt?: string;
   breachPrice?: number;
   breachLevel?: number;
+  /** True when only the session LOW pierced the stop and the close held above it.
+   *  Auto-close fires on observed closes (see the Settings dialog), so an intraday
+   *  wick is information, not a pending sale — the UI must not imply otherwise. */
+  breachIntraday?: boolean;
   note?: string;
 }
 
@@ -165,12 +169,13 @@ export function markStaleDays(lot: PaperLot, scanDate?: string): number {
 /** Latched trailing-stop breach, if one was ever observed and not yet acknowledged. */
 export function stopBreach(
   lot: PaperLot,
-): { at: string; price: number; level: number } | null {
+): { at: string; price: number; level: number; intraday: boolean } | null {
   if (!lot.breachedAt) return null;
   return {
     at: lot.breachedAt,
     price: lot.breachPrice ?? lot.lastMark ?? lot.entryPrice,
     level: lot.breachLevel ?? stopLevel(lot),
+    intraday: lot.breachIntraday ?? false,
   };
 }
 
@@ -373,6 +378,7 @@ export function applyMarks(
       marked.breachedAt = q.asOf ?? date;
       marked.breachPrice = round2(trough);
       marked.breachLevel = round2(level);
+      marked.breachIntraday = price > level;  // close held above; only the wick pierced
       changed = true;
     }
 
