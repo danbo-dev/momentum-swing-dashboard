@@ -7,81 +7,81 @@
     "n_buckets": 5
   },
   "provider": "polygon",
-  "n_observations": 351045,
+  "n_observations": 351351,
   "quantiles": [
     {
       "quantile": 1,
-      "avg_fwd_ret_pct": -0.578,
-      "win_rate_pct": 42.8,
-      "n": 70231
+      "avg_fwd_ret_pct": 0.009,
+      "win_rate_pct": 43.6,
+      "n": 70287
     },
     {
       "quantile": 2,
-      "avg_fwd_ret_pct": 0.476,
+      "avg_fwd_ret_pct": 0.574,
       "win_rate_pct": 48.7,
-      "n": 70197
+      "n": 70262
     },
     {
       "quantile": 3,
-      "avg_fwd_ret_pct": 0.559,
-      "win_rate_pct": 49.9,
-      "n": 70202
+      "avg_fwd_ret_pct": 0.746,
+      "win_rate_pct": 50.5,
+      "n": 70259
     },
     {
       "quantile": 4,
-      "avg_fwd_ret_pct": 1.025,
-      "win_rate_pct": 52.6,
-      "n": 70197
+      "avg_fwd_ret_pct": 1.374,
+      "win_rate_pct": 53.9,
+      "n": 70262
     },
     {
       "quantile": 5,
-      "avg_fwd_ret_pct": 2.139,
-      "win_rate_pct": 51.9,
-      "n": 70218
+      "avg_fwd_ret_pct": 2.372,
+      "win_rate_pct": 52.4,
+      "n": 70281
     }
   ],
-  "long_short_spread_pct": 2.717,
-  "mean_rank_ic": 0.0795,
+  "long_short_spread_pct": 2.363,
+  "mean_rank_ic": 0.0784,
   "top_quantile_equity_curve": [
     {
-      "date": "2025-07-01",
-      "equity": 1.028
+      "date": "2025-07-02",
+      "equity": 0.9993
     },
     {
-      "date": "2025-08-06",
-      "equity": 1.083
+      "date": "2025-08-07",
+      "equity": 1.062
     },
     {
-      "date": "2025-09-11",
-      "equity": 1.1382
+      "date": "2025-09-12",
+      "equity": 1.1717
     },
     {
-      "date": "2025-10-16",
-      "equity": 1.0464
+      "date": "2025-10-17",
+      "equity": 1.0843
     },
     {
-      "date": "2025-11-20",
-      "equity": 1.1304
+      "date": "2025-11-21",
+      "equity": 1.1512
     },
     {
-      "date": "2025-12-29",
-      "equity": 1.2081
+      "date": "2025-12-30",
+      "equity": 1.2039
     },
     {
-      "date": "2026-02-04",
-      "equity": 1.1935
+      "date": "2026-02-05",
+      "equity": 1.2197
     },
     {
-      "date": "2026-03-12",
-      "equity": 1.2417
+      "date": "2026-03-13",
+      "equity": 1.2903
     },
     {
-      "date": "2026-04-17",
-      "equity": 1.2522
+      "date": "2026-04-20",
+      "equity": 1.2842
     },
     {
-      "date": "2026-05-22",
-      "equity": 1.2564
+      "date": "2026-05-26",
+      "equity": 1.2767
     }
   ],
   "verdict": "positive_edge"
