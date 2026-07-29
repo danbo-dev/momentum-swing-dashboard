@@ -60,6 +60,35 @@ enough to effectively disable spacing. Finnhub's free tier (60/min) is the real
 limiter. If you run on Polygon's free tier instead (5 calls/min), lower that
 value and cap the universe with `CONTEXT_UNIVERSE_LIMIT`.
 
+## Positions & trailing stops
+
+Positions are logged in the browser (localStorage `msd_paper_v1`) — the engine places no
+orders and never sees your book. Export/import via **Export / More ▾**; the download is
+named `positions.json`, rename it to `book_export.json` in the repo root if you want the
+engine or the gap-review skill to read it. **Editing an exported file changes nothing
+until you import it back.**
+
+Trailing stops are simulated as **resting orders**, not close-based checks:
+
+| Bar | Result |
+|---|---|
+| Session low pierces the stop | fills **at the stop** |
+| Bar gapped below the stop (open ≤ stop) | fills **at the open** — a resting order can't fill above the market |
+| Stop untouched | no fill |
+
+Two details that matter:
+
+- The level tested is the **pre-ratchet** stop — the one actually resting during that bar.
+  A daily bar doesn't reveal whether the high came before the low, so ratcheting the
+  high-water mark first would invent a stop that never existed.
+- Marks arrive on the engine's daily cadence, so a stop is detected on the **first scan
+  after** the session it was hit — not intraday. `stopMode: "alert"` flags instead of
+  selling; `"auto"` closes the lot.
+
+A latched **breach flag** records the first time price traded through the stop, and is not
+cleared by a recovery — so a dip on a day you didn't check still surfaces. In alert mode an
+intraday-only breach shows amber ("dipped under stop"); a close through the level shows red.
+
 ## Held positions (`HELD_TICKERS`) — keep this current
 
 The scan force-includes held tickers and **always quotes them, even if they fail a
@@ -83,8 +112,27 @@ holding left out reintroduces the stale-price bug. Locally, `python -m engine` r
 `data/positions.json`, then a `book_export.json` in the repo root (gitignored), then
 `$HELD_TICKERS` — first non-empty wins.
 
-## CI
+## Schedule & CI
 
-- **`engine`** — scheduled scans, commits refreshed JSON back to the repo.
-- **`web`** — `npm ci && npm run build` on every `web/**` push. `next build`
-  typechecks, so this verifies TypeScript without a local Node install.
+- **`engine`** — one scan per trading session, `cron: "15 21 * * 1-5"`. That is post-close in
+  both EDT (17:15 ET) and EST (16:15 ET), so it survives the DST change rather than relying on
+  runner lag. GitHub's scheduler runs ~60 min late, so expect a ~22:15 UTC start; data lands
+  early evening ET, ready for a next-morning review. There is deliberately **no midday run** —
+  the funnel reads only completed sessions, so a midday scan reproduced the previous evening's
+  frame while corrupting the price cache.
+- **`web`** — `npm ci && npm run build` on every `web/**` push. `next build` typechecks, so this
+  verifies TypeScript without a local Node install.
+
+Every run stamps `results.json` with `as_of` (which session the prices are for, and what share
+of names actually carry a bar from it) and `timings_sec` (wall clock per stage). The engine
+**refuses to publish** if under 90% of quoted names match the claimed session — prices that
+match no single session shipped undetected for weeks before that check existed.
+
+## Troubleshooting
+
+| Symptom | Cause |
+|---|---|
+| A holding shows a stale price and a frozen stop | It fell out of the scan and isn't in `HELD_TICKERS` |
+| Header says `closes <older date>` in warning colour | A newer session has completed; the scan hasn't run or failed |
+| `Cannot find type definition file for 'node 2'` | iCloud conflict copies in `node_modules` — `rm -rf node_modules && npm ci` |
+| Engine run fails the publish gate | Prices don't match the claimed session; check `as_of` in the log |

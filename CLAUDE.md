@@ -1,133 +1,109 @@
-# momentum-swing-dashboard
+# momentum-swing-dashboard — working notes
 
 Multi-week swing screener. Python engine (`/engine`) → `web/public/data/results.json` → Next.js
-dashboard (`/web`) on Vercel. GitHub Actions runs the engine once per session and commits the JSON
-back, which triggers a redeploy. Repo is **public** and a real git clone — edits here can be pushed.
+dashboard (`/web`) on Vercel. GitHub Actions runs the engine once per trading session and commits
+the JSON back, which triggers a redeploy. Repo is **public** and a real git clone.
 
-> **This file is public.** Keep portfolio specifics out of it — no holdings, position sizes, P&L,
-> or account capital. Engineering notes only. Performance state lives in the private
-> `strategy-gap-review` repo's `reports/`.
+> **This file is public.** No holdings, position sizes, P&L, or account balances. Engineering
+> notes only — portfolio state lives in the private `strategy-gap-review` repo's `reports/`.
 
-## The bug behind the held-quote fix (read before touching marks)
+**`README.md` is the operating manual** — architecture, how to run things, the `HELD_TICKERS`
+procedure, CI, stop simulation. This file holds what you can't infer from the code: invariants
+that look like details but aren't, and the bugs that came from breaking them. Don't duplicate the
+README here.
 
-A held position that drops out of the scan **silently freezes at a stale price, and its trailing
-stop freezes with it** — the dashboard kept showing a comfortable green cushion computed from a
-days-old price while the name was actually trading through its stop.
+## Invariants — break these and the dashboard lies quietly
 
-Chain of causation:
-1. `market` in `results.json` was built only from `scored` names, so a holding that failed a gate
-   had no quote at all.
-2. `paper.ts:currentPrice` falls back to `lot.lastMark` when there is no quote — silently.
-3. `applyMarks` skipped lots with no quote, so the stop never re-evaluated.
-4. `pipeline.py` *does* force-include held tickers (`held`), but `held` came from `positions.json`,
-   which is **empty** — the real book lives in browser localStorage.
+Each was a real production bug. None announced itself; all produced plausible-looking wrong
+numbers.
 
-Fixes: `results.py` emits a quote for every held ticker even when unscored (`unscored: true`) and
-adds `low`/`high`/`asof` to every market row; `paper.ts` latches a `breachedAt` flag the first time
-a price *or session low* trades through the stop and records `lastMarkDate`;
-`__main__.py:_load_positions` falls back to `book_export.json` then `$HELD_TICKERS`.
+**1. A scan is pinned to ONE trading session.** Resolved once in `run_scan` via
+`session.py:resolve_session()` and threaded through the provider; cache keys name it
+(`poly_hist_{tk}_{session}`). **Never put `date.today()` in a fetch path.** A cold run takes tens
+of minutes, so a run that decides "today" per-fetch straddles the 16:00 ET close and caches some
+tickers mid-session and some at the close under one key — the next run then reuses the blend.
+Shipped prices matched no single session; 10 of 12 sampled names were off the real close, one by
+3.3%. `results.json.as_of` states the session and coverage, and `__main__` refuses to publish
+below `MIN_PCT_ON_SESSION` (90%).
 
-## HELD_TICKERS — needs maintenance
+**2. Held names are always quoted, even when they fail a gate.** `results.py` emits an
+`unscored: true` market row for any held ticker missing from `scored`. Without it the UI has no
+quote, `paper.ts:currentPrice` silently falls back to a frozen `lastMark`, and **the trailing stop
+freezes with it** — a position showed a comfortable green cushion for days against a price three
+sessions stale while it traded through its stop. The engine learns holdings from `$HELD_TICKERS`
+(procedure in the README); a stale secret reintroduces exactly this.
 
-`HELD_TICKERS` is a **repository secret** (comma-separated, e.g. `"AAA,BBB,CCC"`) that tells the
-scheduled scan which names to force-include and always quote. It is a secret rather than a variable
-because this repo is public and the value is the owner's open positions.
+**3. Trailing stops are resting orders, not close-based checks.** `paper.ts:stopFill()` triggers
+on the session **low**; a bar that gapped below the level fills at the **open**, not the stop — a
+resting order cannot fill above the market. It tests the **pre-ratchet** stop, because a daily bar
+doesn't say whether the high preceded the low, and ratcheting first would invent a stop that never
+rested. Close-based checks let price trade well through a stop and back: one position's low pierced
+by 7 cents and closed $1.36 above, so nothing sold and the risk stayed on.
 
-**It does not update itself.** The engine cannot see the book — localStorage is unreachable from CI
-— so a stale secret silently reintroduces the exact bug above: a newly-bought name that isn't in
-the screen never gets quoted, and a sold name wastes a quote.
+**4. Position sources are not uniform.** `positions.json` and book-export lots carry a cost basis;
+a `$HELD_TICKERS` entry is only "always quote this name". `pipeline.enrich_positions()` skips the
+exit grade when there's no entry price rather than faking one — subscripting `p["entry_price"]`
+unconditionally killed a scheduled run 33 minutes in, on the one source CI actually uses.
 
-**Update it whenever the book changes** (buy, sell, or trim):
+## Reading the data honestly
 
-```bash
-gh secret set HELD_TICKERS --repo <owner>/momentum-swing-dashboard --body "AAA,BBB,CCC"
-```
+- **Judge the strategy on `kind: "paper"` trades only.** The `real` lots are a migrated
+  buy-and-hold seed (`migratedReal: true`) whose P&L swamps the swing results.
+- **`trend_score` is not a ranking field** — it saturates at 1.0 for anything above both MAs.
+  Rank on `score` (0–100).
+- **Never compare a since-entry return to a fixed-window return.** The window starts before the
+  position existed, so the shortfall is arithmetic, not skill. The gap review scores
+  holding-period-matched excess vs SPY; this exact error produced a bogus "you're entering late"
+  verdict.
+- **Two conclusions were reversed by re-measurement** (2026-07-27): ATR-scaled trailing stops
+  (replayed on real bars, a 2.5×ATR trail lost 3× more than the flat 10%) and late entries
+  (entries sit ~0–3% above EMA20 at RSI 47–61 — not extended; `corr(RSI at entry, outcome)` is
+  +0.44, the opposite sign to the thesis). Both looked obvious from summary statistics. Re-measure
+  before acting on a single-sample read.
 
-Or: repo → Settings → Secrets and variables → Actions → `HELD_TICKERS` → update. Values are
-write-only; re-set to change. Derive the list from a fresh `book_export.json`:
+## State
 
-```bash
-python3 -c "import json;print(','.join(l['ticker'] for l in json.load(open('book_export.json'))['lots']))"
-```
-
-Trimming an over-held name or rotating into a new one **both** require this — the sell alone
-doesn't remove it, and the buy alone doesn't add it. Treat it as the last step of any trade, and
-re-check it during the weekly gap review (that's when a fresh export exists anyway).
-
-Longer-term fix on the backlog: have the dashboard write the ticker list somewhere CI can read, so
-the secret stops being a manual step.
-
-## Sessions — the load-bearing invariant
-
-A scan is **not** a point in time: a cold run takes ~2h on Polygon's free tier. Every fetch is
-therefore pinned to one trading session, resolved ONCE in `run_scan` via
-`engine/session.py:resolve_session()` and threaded through the provider. Cache keys name that
-session (`poly_hist_{tk}_{session}`), so run duration, cron lag, queueing and DST cannot change
-what a run means.
-
-**Never reintroduce `date.today()` into a fetch path.** That was the bug: the midday scan
-straddled the 16:00 ET close, cached some tickers mid-session and some at the close under one
-calendar-date key, and the post-close run reused the blend for up to `cache_ttl_hours: 20`.
-Shipped prices matched no single session — 10 of 12 sampled names were off the real close, by up
-to 3.3%. `results.json.as_of` now states the session and what share of names actually carry it;
-`__main__` refuses to publish below `MIN_PCT_ON_SESSION` (90%).
-
-Use `SESSION_DATE=YYYY-MM-DD` to pin a run for backfills or reproducible tests.
-
-## Schedule
-
-**One scan per session**, `cron: "15 21 * * 1-5"` — post-close in both EDT (17:15 ET) and EST
-(16:15 ET), so it survives the DST change rather than relying on ~60 min of runner lag. Cold run
-~2h, so data lands ~20:30 ET for a next-morning review.
-
-There is deliberately **no midday run**. It could not do what its name implied — `get_recent_bars`
-reads only completed sessions, so a midday scan reproduced the previous evening's frame — and it
-was the thing corrupting the cache. If you ever want an intraday read, it needs a different data
-path, not a differently-timed run.
+- **2026-07-29** — Trailing stops fire intraday with gap-aware fills; `results.py` exposes the
+  session `open`. One position was retroactively closed at its stop to correct history the
+  close-based logic had missed. Positions moved above Opportunities and every section collapses
+  (`Collapsible.tsx`, state persisted per section). Opportunities carry a `held` badge and an
+  "Add to X" button — the engine force-*includes* held names so they keep ranking, and two
+  accidental double-buys had already happened before it shipped.
+- **2026-07-28** — Per-endpoint Finnhub TTLs. Fundamentals were ~95% of a cold scan
+  (`fundamentals+features` 1311s + `earnings` 518s of 1932s) because one global 20h TTL refetched
+  everything daily, including sectors that never change. `results.json.timings_sec` records
+  wall-clock per stage — **read it before optimising anything**; the prime suspect at the time
+  (`grouped_bars`, 90 whole-market responses) turned out to be 4.5s.
+- **2026-07-27** — Sessions pinned; midday run dropped; single post-close schedule.
 
 ## Gotchas
 
-- **The book is in browser localStorage (`msd_paper_v1`), not on disk.** Both
-  `web/public/data/positions.json` and `results.json.positions` are empty seeds. Export via the
-  dashboard's **Export / More ▾**; the download is named `positions.json` — rename it to
-  **`book_export.json`** in the repo root. It is gitignored (it holds P&L), so **CI cannot see it**;
-  that is what `HELD_TICKERS` exists for.
-- **Toolchain (as of 2026-07-26):** Homebrew at `/opt/homebrew`, Node 26 / npm 11 via
-  `brew install node`. Python deps for the engine live in the repo's `.venv`.
-  - engine: `. .venv/bin/activate && python -m pytest engine/tests -q`
-  - web: `cd web && npm ci && npm run build` (`next build` typechecks, so this is the typecheck)
-  - The `web` workflow runs the same build on every `web/**` push, so CI covers it either way.
-  - Non-login shells may not have brew on PATH; prefix with
-    `eval "$(/opt/homebrew/bin/brew shellenv zsh)"` if `node` isn't found.
-- `python -m engine` on synthetic data does **not** finish quickly — it reaches for network. Test
-  engine changes with targeted unit calls, not a full scan.
-- **`~/Documents` is iCloud-synced, which litters `node_modules` with `"name 2"` conflict copies.**
+- **`~/Documents` is iCloud-synced**, which litters `node_modules` with `"name 2"` conflict copies.
   TypeScript treats every directory in `@types/` as an implicit type library, so a stray
   `@types/node 2` fails the build with `Cannot find type definition file for 'node 2'`. Fix:
   `rm -rf node_modules && npm ci`. CI never sees this — it installs clean.
-- **Polygon plan is Stocks Starter — unlimited calls**, so Polygon is NOT the bottleneck and there
-  is no 429 backoff. (An earlier note here claimed the opposite from stale free-tier docs; the
-  limiter is now set high enough to be a no-op.) **Finnhub's 60/min free tier is the real limit**:
-  ~1,460 calls for ~490 survivors ≈ 24 min. That plus ~6 min of former Polygon spacing accounts for
-  only ~30 min of a ~2h cold run — the rest is unexplained, which is why `results.json.timings_sec`
-  now records wall-clock per stage. Read it before optimising anything.
-- **Judge strategy performance on `kind: "paper"` trades only.** The `real` lots are a migrated
-  buy-and-hold seed (`migratedReal: true`) whose P&L swamps the swing results.
-- `trend_score` saturates at 1.0 for any name above both MAs — never rank on it; use `score`.
+- **The book is in browser localStorage (`msd_paper_v1`)**, not on disk.
+  `web/public/data/positions.json` and `results.json.positions` are empty seeds. Editing an
+  exported file changes nothing until it is **imported back through the dashboard**.
+- **Polygon is Stocks Starter — unlimited calls**, so it is not the bottleneck and there is no 429
+  backoff. Finnhub's 60/min free tier is the real limit; the limiter sits at 55 because sitting
+  exactly on 60 trips 429s and the backoff costs more than the spacing saves.
+- **`python -m engine` on synthetic data does not finish quickly** — it reaches for network. Test
+  engine changes with targeted unit calls, not a full scan.
+- **Toolchain:** Homebrew at `/opt/homebrew`, Node 26 / npm 11; engine deps in the repo `.venv`.
+  Non-login shells may lack brew on PATH — prefix with
+  `eval "$(/opt/homebrew/bin/brew shellenv zsh)"`.
 
-## Deferred backlog
+## Backlog
 
-- **Reconsider the trailing stop only with more data.** ATR-scaling was investigated 2026-07-27 and
-  **rejected**: replayed on real bars a 2.5xATR trail lost $246 vs the flat 10%'s $80 across the
-  four closed paper trades — all four kept falling after the stop. Revisit after ~20 more trades.
-- **Find the missing ~80 min of a cold run** using `results.json.timings_sec` (added 2026-07-27).
-  Prime suspect is `grouped_bars`: 90 whole-market grouped-daily responses, ~13.5k tickers each,
-  downloaded, JSON-parsed and disk-cached — not a rate limit, just volume. If so, options are a
-  shorter `funnel.screen_days`, a columnar cache, or reusing prior days' parsed frames.
-- **Surface `acknowledgeBreach` in the UI** — the helper exists in `paper.ts` but nothing calls it,
-  so a latched breach flag currently clears only by selling.
-- **Automate `HELD_TICKERS`** (see above) so holdings reach CI without a manual secret update.
-- **Entry timing** — investigated 2026-07-27 and **not established**: entries sit ~0-3% above EMA20
-  at RSI 47-61 (not extended), and corr(RSI at entry, outcome) is +0.44. The earlier "buying late"
-  read came from comparing a 21-day window to a ~12-day hold. The gap review now tracks
-  holding-period-matched excess vs SPY plus `pre_entry_run_pct`; revisit with ~20 more trades.
+- **Verify the Finnhub TTL saving** on the next cold run via `timings_sec`; projected ~27 min →
+  ~4.5 min on per-ticker fundamentals.
+- **Instrument `engine.backtest`** — ~35 min, uninstrumented, roughly doubles the job's wall clock.
+- **Watch the exit rate.** Intraday stops fire more often than close-based ones. That's intended,
+  but it is a real strategy change and should show up as more closed trades and shorter holds in
+  the next gap review. Confirm it's an improvement rather than assuming.
+- **Surface `acknowledgeBreach`** — the helper exists in `paper.ts` but nothing calls it, so a
+  latched breach flag clears only by selling.
+- **Automate `HELD_TICKERS`** so holdings reach CI without a manual secret update.
+- **Rejected — do not retry without new evidence:** ATR-scaled trailing stops; entry-timing
+  changes. Both investigated 2026-07-27, evidence under "Reading the data honestly".
