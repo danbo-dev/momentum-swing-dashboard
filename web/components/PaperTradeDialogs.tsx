@@ -353,8 +353,10 @@ function SettingsForm() {
           </label>
         </div>
         <div className="muted" style={{ fontSize: 11, marginTop: 6 }}>
-          Marks are end-of-day (engine cadence), so stops fire on observed closes — overnight
-          gaps can exceed the level, so a fill at the exact stop is an approximation.
+          Stops are simulated like a resting order: the session <b>low</b> triggers the fill, not
+          the close. A price that gapped below the level fills at the open; otherwise at the stop.
+          Marks arrive on the engine&apos;s daily cadence, so a stop is detected on the first scan
+          after the session it was hit.
         </div>
       </div>
 

@@ -125,8 +125,8 @@ function PositionRow({ lot }: { lot: PaperLot }) {
                 className={`badge ${breach.intraday ? "status-warning" : "status-critical"}`}
                 title={
                   breach.intraday
-                    ? `On ${breach.at} the low (${money(breach.price)}) dipped under the ${money(breach.level)} stop, but the close held above it. Auto-close fires on closes, so nothing was sold — this is a heads-up, not a pending sale.`
-                    : `Closed at or below the ${money(breach.level)} stop on ${breach.at}.`
+                    ? `On ${breach.at} the low (${money(breach.price)}) traded through the ${money(breach.level)} stop, though the close recovered above it. In alert mode nothing is sold — sell manually or switch to auto-close.`
+                    : `Price traded through the ${money(breach.level)} stop on ${breach.at}.`
                 }
               >
                 {breach.intraday

@@ -45,6 +45,7 @@ export default async function Page() {
     if (quotes[ticker]) {
       // Opportunities are built from `spark` and carry no bar context; the market
       // block has it for every quoted name, holdings included.
+      quotes[ticker].open = m.open;
       quotes[ticker].low = m.low;
       quotes[ticker].high = m.high;
       quotes[ticker].asOf = m.asof;
@@ -57,6 +58,7 @@ export default async function Page() {
       emaSlow: m.ema_slow,
       atr: m.atr,
       rsi: m.rsi,
+      open: m.open,
       low: m.low,
       high: m.high,
       asOf: m.asof,

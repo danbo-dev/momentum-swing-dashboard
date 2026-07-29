@@ -33,12 +33,13 @@ def change_pct(close: pd.Series, bars: int) -> float:
 
 
 def _bar_context(df: pd.DataFrame | None) -> dict:
-    """Session low/high + the bar's date, so the UI can detect an intraday stop breach
-    that a close-only comparison misses (a dip through the trail that closes back above
-    it is still a breach)."""
+    """Session open/low/high + the bar's date. A trailing stop is a resting order, so
+    the UI needs the intraday path to simulate it: `low` says whether the stop was hit,
+    and `open` gives the realistic fill when the price gapped straight through it."""
     if df is None or df.empty:
         return {}
     return {
+        "open": round(float(df["open"].iloc[-1]), 2),
         "low": round(float(df["low"].iloc[-1]), 2),
         "high": round(float(df["high"].iloc[-1]), 2),
         "asof": df.index[-1].strftime("%Y-%m-%d"),

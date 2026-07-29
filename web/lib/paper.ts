@@ -39,9 +39,11 @@ export interface Quote {
   emaSlow?: number;
   atr?: number;
   rsi?: number;
-  /** Session low — a dip through the trail that closes back above it is still a
-   *  breach, and a close-only comparison never sees it. */
+  /** Session low — a trailing stop is a resting order, so the low is what decides
+   *  whether it was hit, not the close. */
   low?: number;
+  /** Session open — a price that gapped through the stop fills here, not at the stop. */
+  open?: number;
   high?: number;
   /** Date of the bar this quote came from (yyyy-mm-dd). */
   asOf?: string;
@@ -155,6 +157,28 @@ export function stopLevel(lot: Pick<PaperLot, "highWatermark" | "trailPct">): nu
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+/** Where a resting trailing stop would actually have filled on this bar, or null if
+ *  it was never touched.
+ *
+ *  A trailing stop is a live order, so the session LOW decides whether it triggered —
+ *  waiting for the close lets price trade well through the level and back. Two fills:
+ *
+ *    gap down (open <= stop) -> the stop became a market order at the open, and the
+ *                               open is the realistic fill. Filling at the stop would
+ *                               flatter every gap.
+ *    touched intraday        -> fills at the stop level.
+ *
+ *  The level is the PRE-ratchet stop — the one resting during the bar. Daily bars don't
+ *  say whether the high came before the low, so ratcheting on today's high before
+ *  testing today's low would invent a stop that never existed. */
+export function stopFill(lot: PaperLot, q: Pick<Quote, "price" | "low" | "open">): number | null {
+  const level = stopLevel(lot);
+  const low = q.low ?? q.price;
+  if (low > level) return null;
+  const open = q.open;
+  return open !== undefined && open <= level ? round2(open) : round2(level);
 }
 
 /** A lot whose displayed price is frozen: the engine stopped quoting it (it fell out
@@ -383,9 +407,10 @@ export function applyMarks(
     }
 
     if (acc.stopMode === "auto") {
-      if (price <= level) {
-        closed.push(realizedTrade(marked, marked.shares, level, date, "trailing_stop"));
-        if (marked.kind === "paper") cash += marked.shares * level;
+      const fill = stopFill(lot, q);
+      if (fill !== null) {
+        closed.push(realizedTrade(marked, marked.shares, fill, q.asOf ?? date, "trailing_stop"));
+        if (marked.kind === "paper") cash += marked.shares * fill;
         changed = true;
         continue; // lot fully closed
       }

@@ -187,8 +187,9 @@ export interface MarketRow {
   ema_slow: number;
   atr: number;
   rsi: number;
-  /** Session low/high and bar date — present from schema 2 onward. `low` is what
-   *  makes an intraday stop breach detectable when the bar closes back above it. */
+  /** Session open/low/high and bar date — present from schema 2 onward. `low` makes
+   *  an intraday stop breach detectable; `open` prices a gap through the stop. */
+  open?: number;
   low?: number;
   high?: number;
   asof?: string;
