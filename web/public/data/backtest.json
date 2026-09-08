@@ -7,53 +7,53 @@
     "n_buckets": 5
   },
   "provider": "polygon",
-  "n_observations": 352576,
+  "n_observations": 352377,
   "quantiles": [
     {
       "quantile": 1,
-      "avg_fwd_ret_pct": -0.371,
+      "avg_fwd_ret_pct": -0.362,
       "win_rate_pct": 43.1,
-      "n": 70538
+      "n": 70494
     },
     {
       "quantile": 2,
-      "avg_fwd_ret_pct": 0.638,
-      "win_rate_pct": 47.8,
-      "n": 70503
+      "avg_fwd_ret_pct": 0.641,
+      "win_rate_pct": 47.9,
+      "n": 70466
     },
     {
       "quantile": 3,
-      "avg_fwd_ret_pct": 0.891,
+      "avg_fwd_ret_pct": 0.89,
       "win_rate_pct": 49.8,
-      "n": 70506
+      "n": 70463
     },
     {
       "quantile": 4,
-      "avg_fwd_ret_pct": 3.801,
+      "avg_fwd_ret_pct": 3.793,
       "win_rate_pct": 54.2,
-      "n": 70503
+      "n": 70466
     },
     {
       "quantile": 5,
-      "avg_fwd_ret_pct": 2.117,
+      "avg_fwd_ret_pct": 2.114,
       "win_rate_pct": 53.0,
-      "n": 70526
+      "n": 70488
     }
   ],
-  "long_short_spread_pct": 2.488,
-  "mean_rank_ic": 0.0848,
+  "long_short_spread_pct": 2.476,
+  "mean_rank_ic": 0.0847,
   "top_quantile_equity_curve": [
     {
       "date": "2025-08-11",
-      "equity": 1.0626
+      "equity": 1.0631
     },
     {
       "date": "2025-09-16",
-      "equity": 1.176
+      "equity": 1.1766
     },
     {
       "date": "2025-10-21",
-      "equity": 1.0825
+      "equity": 1.0826
     },
     {
       "date": "2025-11-25",
@@ -61,27 +61,27 @@
     },
     {
       "date": "2026-01-02",
-      "equity": 1.1965
+      "equity": 1.1959
     },
     {
       "date": "2026-02-09",
-      "equity": 1.1758
+      "equity": 1.1754
     },
     {
       "date": "2026-03-17",
-      "equity": 1.2461
+      "equity": 1.2459
     },
     {
       "date": "2026-04-22",
-      "equity": 1.2877
+      "equity": 1.2876
     },
     {
       "date": "2026-05-28",
-      "equity": 1.2939
+      "equity": 1.2938
     },
     {
       "date": "2026-07-06",
-      "equity": 1.267
+      "equity": 1.2669
     }
   ],
   "verdict": "positive_edge"
