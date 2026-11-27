@@ -7,41 +7,41 @@
     "n_buckets": 5
   },
   "provider": "polygon",
-  "n_observations": 353380,
+  "n_observations": 353230,
   "quantiles": [
     {
       "quantile": 1,
-      "avg_fwd_ret_pct": -3.128,
+      "avg_fwd_ret_pct": -3.118,
       "win_rate_pct": 39.5,
-      "n": 70694
+      "n": 70671
     },
     {
       "quantile": 2,
-      "avg_fwd_ret_pct": -0.605,
-      "win_rate_pct": 43.7,
-      "n": 70671
+      "avg_fwd_ret_pct": -0.6,
+      "win_rate_pct": 43.8,
+      "n": 70633
     },
     {
       "quantile": 3,
       "avg_fwd_ret_pct": -0.325,
       "win_rate_pct": 46.2,
-      "n": 70661
+      "n": 70638
     },
     {
       "quantile": 4,
-      "avg_fwd_ret_pct": 0.192,
+      "avg_fwd_ret_pct": 0.194,
       "win_rate_pct": 49.5,
-      "n": 70671
+      "n": 70633
     },
     {
       "quantile": 5,
-      "avg_fwd_ret_pct": -0.088,
+      "avg_fwd_ret_pct": -0.089,
       "win_rate_pct": 47.1,
-      "n": 70683
+      "n": 70655
     }
   ],
-  "long_short_spread_pct": 3.04,
-  "mean_rank_ic": 0.0882,
+  "long_short_spread_pct": 3.029,
+  "mean_rank_ic": 0.0881,
   "top_quantile_equity_curve": [
     {
       "date": "2025-10-30",
@@ -53,31 +53,31 @@
     },
     {
       "date": "2026-01-13",
-      "equity": 0.9927
+      "equity": 0.993
     },
     {
       "date": "2026-02-19",
-      "equity": 0.913
+      "equity": 0.9132
     },
     {
       "date": "2026-03-26",
-      "equity": 0.9933
+      "equity": 0.9936
     },
     {
       "date": "2026-05-01",
-      "equity": 1.0497
+      "equity": 1.0501
     },
     {
       "date": "2026-06-08",
-      "equity": 1.0621
+      "equity": 1.0625
     },
     {
       "date": "2026-07-15",
-      "equity": 1.0738
+      "equity": 1.0742
     },
     {
       "date": "2026-08-19",
-      "equity": 1.0444
+      "equity": 1.0448
     },
     {
       "date": "2026-09-24",

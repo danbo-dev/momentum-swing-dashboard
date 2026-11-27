@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "generated_at": "2026-11-26T04:10:06.583670+00:00",
+  "generated_at": "2026-11-27T04:13:45.980028+00:00",
   "as_of": {
     "session": "2026-11-25",
     "names_on_session": 435,
@@ -9,10 +9,10 @@
     "current": true
   },
   "timings_sec": {
-    "universe": 4.8,
-    "grouped_bars": 62.1,
+    "universe": 2.3,
+    "grouped_bars": 34.8,
     "screen": 0.8,
-    "history": 134.3,
+    "history": 61.0,
     "earnings": 544.5,
     "fundamentals+features": 1493.6
   },
@@ -57,7 +57,7 @@
     },
     "quality_dropped": 64,
     "funnel": {
-      "base": 8586,
+      "base": 8585,
       "grouped_names": 13853,
       "screened": 1733,
       "bucket": 505,
@@ -447,7 +447,7 @@
           2122709,
           1430459,
           940496,
-          1610258,
+          1610421,
           981641
         ]
       },
@@ -488,7 +488,7 @@
       "catalyst_score": 0.84875,
       "catalyst_detail": {
         "earnings_date": "2027-03-09",
-        "days_to_earnings": 103,
+        "days_to_earnings": 102,
         "earnings_soon": false,
         "last_surprise_pct": 1.1049,
         "rec_trend": 0.395
@@ -844,7 +844,7 @@
           1380542,
           1873375,
           1860437,
-          1369235,
+          1369234,
           780543
         ]
       },
@@ -2823,7 +2823,7 @@
           2117761,
           1917901,
           1823761,
-          2462318,
+          2464657,
           2182904
         ]
       },
@@ -4448,7 +4448,7 @@
       "catalyst_score": 0.85,
       "catalyst_detail": {
         "earnings_date": "2027-03-17",
-        "days_to_earnings": 111,
+        "days_to_earnings": 110,
         "earnings_soon": false,
         "last_surprise_pct": 2.325,
         "rec_trend": 0.4
@@ -5199,7 +5199,7 @@
           1894447,
           2483169,
           2101191,
-          1781474,
+          1782171,
           2086542
         ]
       },
@@ -5594,7 +5594,7 @@
           1092260,
           876067,
           1108156,
-          959230,
+          959319,
           1363996
         ]
       },
@@ -6425,7 +6425,7 @@
       "catalyst_score": 0.79175,
       "catalyst_detail": {
         "earnings_date": "2027-03-02",
-        "days_to_earnings": 96,
+        "days_to_earnings": 95,
         "earnings_soon": false,
         "last_surprise_pct": 1.1084,
         "rec_trend": 0.167
@@ -7215,7 +7215,7 @@
       "catalyst_score": 0.663,
       "catalyst_detail": {
         "earnings_date": "2027-03-02",
-        "days_to_earnings": 96,
+        "days_to_earnings": 95,
         "earnings_soon": false,
         "last_surprise_pct": 5.5912,
         "rec_trend": -0.348
@@ -7569,7 +7569,7 @@
           1074959,
           688873,
           862807,
-          889359,
+          889423,
           559660
         ]
       },
@@ -9943,7 +9943,7 @@
           4019168,
           1747930,
           2221039,
-          3562642,
+          3562342,
           3675178
         ]
       },
@@ -10338,7 +10338,7 @@
           2945108,
           3164093,
           2060271,
-          2099301,
+          2099650,
           2576193
         ]
       },
@@ -11128,7 +11128,7 @@
           879429,
           782018,
           1067284,
-          1209878,
+          1209882,
           604840
         ]
       },
@@ -12315,7 +12315,7 @@
           1368195,
           621109,
           574382,
-          920960,
+          921269,
           631361
         ]
       },
@@ -12753,7 +12753,7 @@
       "catalyst_score": 0.5956250000000001,
       "catalyst_detail": {
         "earnings_date": "2027-03-17",
-        "days_to_earnings": 111,
+        "days_to_earnings": 110,
         "earnings_soon": false,
         "last_surprise_pct": 0.0099,
         "rec_trend": 0.333
@@ -13940,7 +13940,7 @@
       "catalyst_score": 0.7202500000000001,
       "catalyst_detail": {
         "earnings_date": "2027-03-08",
-        "days_to_earnings": 102,
+        "days_to_earnings": 101,
         "earnings_soon": false,
         "last_surprise_pct": 0.0904,
         "rec_trend": 0.429
@@ -15520,7 +15520,7 @@
       "catalyst_score": 0.61175,
       "catalyst_detail": {
         "earnings_date": "2027-03-01",
-        "days_to_earnings": 95,
+        "days_to_earnings": 94,
         "earnings_soon": false,
         "last_surprise_pct": 0.0104,
         "rec_trend": 0.395
@@ -15876,7 +15876,7 @@
           1760926,
           1135931,
           1975449,
-          1911029,
+          1911144,
           2107496
         ]
       },
